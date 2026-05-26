@@ -18,9 +18,10 @@ module.exports = {
 		};
 		transporter.sendMail(mailOptions, function (err, info) {
 			if (err) {
-				res.json({ status: 'error', message: 'mail error', data: null });
 				console.log(err);
-			} else console.log(info);
+				return res.json({ status: 'error', message: 'mail error', data: null });
+			}
+			console.log(info);
 			res.json({ status: 'success', message: 'mail sent successfully!!!', data: null });
 		});
 	},

@@ -64,46 +64,44 @@ class DividerExampleVerticalForm extends Component {
   }
   signin =  async event => {
       const email = document.getElementById('signin_email').value;
-      this.setState({email: document.getElementById('signin_email').value});
       const password = document.getElementById("signin_password").value;
       var http = new XMLHttpRequest();
       var url = "company/authenticate";
       var params = "email=" + email + "&password=" + password;
       http.open("POST", url, true);
-      //Send the proper header information along with the request
-      http.setRequestHeader(
-        "Content-type",
-        "application/x-www-form-urlencoded"
-      );
-      http.onreadystatechange = function() {
-        //Call a function when the state changes.
+      http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      http.onreadystatechange = async function() {
         if (http.readyState == 4 && http.status == 200) {
 		  var responseObj = JSON.parse(http.responseText);
 		  if(responseObj.status=="success") {
             Cookies.set('company_id', encodeURI(responseObj.data.id));
-            Cookies.set('company_email', encodeURI(responseObj.data.email)); 
-		  }
-		  else {
+            Cookies.set('company_email', encodeURI(responseObj.data.email));
+            // Now call blockchain with the real email
+            try {
+              const web3mod = (await import('../Ethereum/web3')).default;
+              const EF = (await import('../Ethereum/election_factory')).default;
+              const accounts = await web3mod.eth.getAccounts();
+              let summary;
+              try {
+                summary = await EF.methods.getDeployedElection(email).call({from: accounts[0]});
+              } catch(e) {
+                summary = ['0x0000000000000000000000000000000000000000', '', 'Create an election.'];
+              }
+              if(summary[2] == "Create an election.") {
+                Router.pushRoute(`/election/create_election`);
+              } else {
+                Cookies.set('address', summary[0]);
+                Router.pushRoute(`/election/${summary[0]}/company_dashboard`);
+              }
+            } catch(e) {
+              Router.pushRoute(`/election/create_election`);
+            }
+		  } else {
 			alert(responseObj.message);
 		  }
-          
         }
       };
-      http.send(params); 
-      try {
-        const accounts = await web3.eth.getAccounts();
-        const summary = await Election_Factory.methods.getDeployedElection(this.state.email).call({from: accounts[0]});
-        if(summary[2] == "Create an election.") {            
-            Router.pushRoute(`/election/create_election`);
-        }
-        else {           
-            Cookies.set('address',summary[0]);
-            Router.pushRoute(`/election/${summary[0]}/company_dashboard`);
-        }
-    }
-    catch (err) {
-        console.log(err.Message);
-    }
+      http.send(params);
   }
 
   render() {

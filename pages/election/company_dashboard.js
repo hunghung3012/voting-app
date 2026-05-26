@@ -184,42 +184,61 @@ class ContainerExampleContainer extends Component {
 		Router.pushRoute('/homepage');
 	}
 	endElection = async event => {
-		let candidate = 0;
 		try {
 			this.setState({ loading: true });
-			const add = Cookies.get('address');
-			const election = Election(add);
-			candidate = await election.methods.winnerCandidate().call();
-			cand = await election.methods.getCandidate(candidate).call();
-			var http = new XMLHttpRequest();
-			var url = '/voter/resultMail';
-			var params =
-				'election_address=' +
-				Cookies.get('address') +
-				'&election_name=' +
-				this.state.election_name +
-				'&candidate_email=' +
-				cand[4] +
-				'&winner_candidate=' +
-				cand[0];
-			http.open('POST', url, true);
-			//Send the proper header information along with the request
+			const add = decodeURIComponent(Cookies.get('address') || '');
+
+			// Call winnerCandidate() via window.ethereum (read-only call)
+			const { AbiCoder } = require('web3-eth-abi');
+			const abi = new AbiCoder();
+
+			const winnerData = abi.encodeFunctionCall(
+				{ name: 'winnerCandidate', type: 'function', inputs: [] },
+				[]
+			);
+			const winnerResult = await window.ethereum.request({
+				method: 'eth_call',
+				params: [{ to: add, data: winnerData }, 'latest'],
+			});
+			const winnerId = parseInt(winnerResult, 16);
+
+			// Call getCandidate(winnerId) via window.ethereum
+			const getCandData = abi.encodeFunctionCall(
+				{ name: 'getCandidate', type: 'function', inputs: [{ type: 'uint8', name: 'candidateID' }] },
+				[winnerId]
+			);
+			const candResult = await window.ethereum.request({
+				method: 'eth_call',
+				params: [{ to: add, data: getCandData }, 'latest'],
+			});
+			const candDecoded = abi.decodeParameters(
+				[{ type: 'string' }, { type: 'string' }, { type: 'string' }, { type: 'uint8' }, { type: 'string' }],
+				candResult
+			);
+			const winnerName = candDecoded[0];
+			const winnerEmail = candDecoded[4];
+			const winnerVotes = candDecoded[3];
+
+			// Send result mail via API
+			const http = new XMLHttpRequest();
+			http.open('POST', '/voter/resultMail', true);
 			http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-			http.onreadystatechange = function () {
-				//Call a function when the state changes.
-				if (http.readyState == 4 && http.status == 200) {
-					var responseObj = JSON.parse(http.responseText);
-					if (responseObj.status == 'success') {
-						alert('Mail sent!');
+			http.onreadystatechange = () => {
+				if (http.readyState == 4) {
+					this.setState({ loading: false });
+					if (http.status == 200) {
+						alert(`Election ended!\n\nWinner: ${winnerName}\nEmail: ${winnerEmail}\nVotes: ${winnerVotes}\n\nResult emails have been sent to all voters.`);
 					} else {
-						alert(responseObj.message);
+						alert(`Election ended!\n\nWinner: ${winnerName}\nEmail: ${winnerEmail}\nVotes: ${winnerVotes}\n\n(Email sending may have failed)`);
 					}
 				}
 			};
-			this.setState({ loading: true });
+			const params = `election_address=${encodeURIComponent(add)}&election_name=${encodeURIComponent(this.state.election_name)}&candidate_email=${encodeURIComponent(winnerEmail)}&winner_candidate=${encodeURIComponent(winnerName)}`;
 			http.send(params);
 		} catch (err) {
-			console.log(err.message);
+			this.setState({ loading: false });
+			alert('Error ending election: ' + (err.message || err));
+			console.log(err);
 		}
 	};
 

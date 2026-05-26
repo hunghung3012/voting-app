@@ -1,5 +1,5 @@
 const CompanyModel = require('../models/company');
-const bcrypt = require('bcrypt'); 
+const bcrypt = require('bcryptjs'); 
 const path = require('path');
 module.exports = {
     create: function(req, res, cb) {
@@ -35,7 +35,7 @@ module.exports = {
             if (err) 
                 cb(err);
             else {
-                if(bcrypt.compareSync(req.body.password, CompanyInfo.password) && CompanyInfo.email == req.body.email) {
+                if(CompanyInfo && bcrypt.compareSync(req.body.password, CompanyInfo.password) && CompanyInfo.email == req.body.email) {
                     
                     res.json({status:"success", message: "company found!!!", data:{id: CompanyInfo._id, email: CompanyInfo.email}});
                 }

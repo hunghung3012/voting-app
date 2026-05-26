@@ -15,7 +15,7 @@
    ```
 3. Paste the deployment details here:
 
-- **Contract Address:** `[WAITING FOR DEPLOYMENT]`
+- **Contract Address:** `0xCfEB869F69431e42cdB54A4F4f105C19C080A601`
 - **Network:** Ganache local (port 8545, networkId 5777)
 - **Deployer Account:** `0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1` (Account 0)
 

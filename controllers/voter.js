@@ -1,6 +1,6 @@
 const VoterModel = require('../models/voter');
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const path = require('path');
 
@@ -205,79 +205,62 @@ module.exports = {
 
 	resultMail: function (req, res, cb) {
 		VoterModel.find({ election_address: req.body.election_address }, function (err, voters) {
-			if (err) cb(err);
-			else {
-				const election_name = req.body.election_name;
+			if (err) return cb(err);
 
-				const winner_candidate = req.body.winner_candidate;
+			const election_name = req.body.election_name;
+			const winner_candidate = req.body.winner_candidate;
+			const candidate_email = req.body.candidate_email;
 
-				for (let voter of voters) {
-					var transporter = nodemailer.createTransport({
-						service: 'gmail',
+			var transporter = nodemailer.createTransport({
+				service: 'gmail',
+				auth: {
+					user: process.env.EMAIL,
+					pass: process.env.PASSWORD,
+				},
+			});
 
-						auth: {
-							user: process.env.EMAIL,
+			// Collect all mail promises
+			let mailPromises = [];
 
-							pass: process.env.PASSWORD,
-						},
-					});
-
-					const mailOptions = {
-						from: process.env.EMAIL, // sender address
-
-						to: voter.email, // list of receivers
-
-						subject: election_name + ' results', // Subject line
-
-						html:
-							'The results of ' +
-							election_name +
-							' are out.<br>The winner candidate is: <b>' +
-							winner_candidate +
-							'</b>.',
-					};
-
-					transporter.sendMail(mailOptions, function (err, info) {
-						if (err) {
-							res.json({ status: 'error', message: 'mail error', data: null });
-
-							console.log(err);
-						} else console.log(info);
-
-						res.json({ status: 'success', message: 'mails sent successfully!!!', data: null });
-					});
-				}
-
-				var transporter = nodemailer.createTransport({
-					service: 'gmail',
-
-					auth: {
-						user: process.env.EMAIL,
-
-						pass: process.env.PASSWORD,
-					},
-				});
-
+			// Send result to all voters
+			for (let voter of voters) {
 				const mailOptions = {
-					from: process.env.EMAIL, // sender address
-
-					to: req.body.candidate_email, // list of receivers
-
-					subject: req.body.election_name + ' results !!!', // Subject line
-
-					html: 'Congratulations you won ' + req.body.election_name + ' election.', // plain text body
+					from: process.env.EMAIL,
+					to: voter.email,
+					subject: election_name + ' results',
+					html: 'The results of ' + election_name + ' are out.<br>The winner candidate is: <b>' + winner_candidate + '</b>.',
 				};
-
-				transporter.sendMail(mailOptions, function (err, info) {
-					if (err) {
-						res.json({ status: 'error', message: 'mail error', data: null });
-
-						console.log(err);
-					} else console.log(info);
-
-					res.json({ status: 'success', message: 'mail sent successfully!!!', data: null });
-				});
+				mailPromises.push(new Promise((resolve, reject) => {
+					transporter.sendMail(mailOptions, function (err, info) {
+						if (err) { console.log('Mail error for ' + voter.email, err); resolve(false); }
+						else { console.log('Mail sent to ' + voter.email, info); resolve(true); }
+					});
+				}));
 			}
+
+			// Send congratulations to the winner
+			if (candidate_email) {
+				const winnerMail = {
+					from: process.env.EMAIL,
+					to: candidate_email,
+					subject: election_name + ' results !!!',
+					html: 'Congratulations you won ' + election_name + ' election.',
+				};
+				mailPromises.push(new Promise((resolve, reject) => {
+					transporter.sendMail(winnerMail, function (err, info) {
+						if (err) { console.log('Winner mail error', err); resolve(false); }
+						else { console.log('Winner mail sent', info); resolve(true); }
+					});
+				}));
+			}
+
+			// Wait for all mails, then respond ONCE
+			Promise.all(mailPromises).then(results => {
+				const sent = results.filter(r => r).length;
+				res.json({ status: 'success', message: `${sent} mails sent successfully!`, data: null });
+			}).catch(e => {
+				res.json({ status: 'error', message: 'Mail sending error', data: null });
+			});
 		});
 	},
 };

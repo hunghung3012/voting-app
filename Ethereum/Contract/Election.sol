@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.0;
 
 contract ElectionFact {
     
@@ -11,17 +11,17 @@ contract ElectionFact {
     mapping(string=>ElectionDet) companyEmail;
     
     function createElection(string memory email,string memory election_name, string memory election_description) public{
-        address newElection = new Election(msg.sender , election_name, election_description);
+        address newElection = address(new Election(msg.sender , election_name, election_description));
         
         companyEmail[email].deployedAddress = newElection;
         companyEmail[email].el_n = election_name;
         companyEmail[email].el_d = election_description;
     }
     
-    function getDeployedElection(string memory email) public view returns (address,string,string) {
+    function getDeployedElection(string memory email) public view returns (address,string memory,string memory) {
         address val =  companyEmail[email].deployedAddress;
-        if(val == 0) 
-            return (0,"","Create an election.");
+        if(val == address(0)) 
+            return (address(0),"","Create an election.");
         else
             return (companyEmail[email].deployedAddress,companyEmail[email].el_n,companyEmail[email].el_d);
     }
@@ -36,7 +36,7 @@ contract Election {
     bool status;
     
     //election_authority's address taken when it deploys the contract
-    constructor(address authority , string name, string description) public {
+    constructor(address authority , string memory name, string memory description) public {
         election_authority = authority;
         election_name = name;
         election_description = description;
@@ -89,7 +89,7 @@ contract Election {
     }
     //function to vote and check for double voting
 
-    function vote(uint8 candidateID,string e) public {
+    function vote(uint8 candidateID,string memory e) public {
 
         //if false the vote will be registered
         require(!voters[e].voted, "Error:You cannot double vote");
@@ -132,7 +132,7 @@ contract Election {
         return (candidateID);
     }
     
-    function getElectionDetails() public view returns(string, string) {
+    function getElectionDetails() public view returns(string memory, string memory) {
         return (election_name,election_description);    
     }
 }
