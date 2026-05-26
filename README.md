@@ -1,84 +1,68 @@
-# BlockChainVoting
+# Hệ Thống Bầu Cử Trực Tuyến Ứng Dụng Công Nghệ Blockchain (Blockchain Voting App)
 
-A blockchain-based E-voting system, created as the final year project of Shri Bhagubhai Mafatlal Polytechnic. Teammates include me, Sayyam Gada and Charmee Mehta.
-> The application is MIT-Licensed.
+Dự án này là một ứng dụng Web phi tập trung (DApp) cung cấp một giải pháp bầu cử điện tử an toàn, minh bạch và không thể gian lận dựa trên công nghệ Blockchain. Thay vì sử dụng cơ sở dữ liệu truyền thống, các phiếu bầu sẽ được lưu trữ dưới dạng các Smart Contract trên chuỗi khối Ethereum, đảm bảo tính toàn vẹn của kết quả.
 
-## Build Setup
+## ✨ Tính Năng Nổi Bật
 
+* **Phân quyền người dùng rõ ràng**: Hỗ trợ 2 vai trò chính bao gồm Tổ chức (Admin) và Cử tri (Voter).
+* **Quản lý bầu cử linh hoạt**: Ban tổ chức có thể tạo ra các cuộc bầu cử, thêm danh sách ứng cử viên, và cấp quyền cho cử tri.
+* **Bỏ phiếu minh bạch**: Cử tri chỉ có quyền bỏ phiếu một lần duy nhất cho cuộc bầu cử mà họ được tham gia thông qua việc ký giao dịch trên MetaMask.
+* **Theo dõi kết quả Real-time**: Kết quả kiểm phiếu được thể hiện trực quan trên bảng điều khiển ngay sau khi cuộc bầu cử kết thúc.
+* **Tự động hoá thông báo**: Hệ thống tự động gửi email thông báo kết quả cho người chiến thắng cũng như toàn bộ cử tri khi cuộc bầu cử khép lại.
+
+## 🛠 Công Nghệ Sử Dụng
+
+* **Frontend**: Next.js, React, Semantic UI
+* **Backend**: Node.js, Express.js
+* **Cơ Sở Dữ Liệu**: MongoDB
+* **Blockchain**: Solidity (Smart Contracts), Ganache (Mạng lưới test cục bộ), Web3.js / Ethers.js (Tương tác với Blockchain)
+* **Khác**: Nodemailer (Gửi Email)
+
+## 🚀 Hướng Dẫn Cài Đặt Và Khởi Chạy
+
+### 1. Yêu cầu hệ thống
+* Node.js (Phiên bản v22 hoặc tương đương)
+* MongoDB đang chạy ở cổng mặc định `27017`
+* Ganache CLI hoặc Ganache UI đang chạy ở cổng `8545` (Chain ID `1337`)
+* Ví MetaMask extension cài đặt trên trình duyệt
+
+### 2. Các bước cài đặt
+
+**Bước 1: Clone dự án về máy**
 ```bash
-# install dependencies
+git clone https://github.com/hunghung3012/voting-app.git
+cd voting-app/BlockChainVoting
+```
+
+**Bước 2: Cài đặt các thư viện**
+```bash
 npm install
-
-# serve with hot reload at localhost:3000
-npm start
 ```
 
-Create your own <b>.env</b> file and the file should contain:
+**Bước 3: Thiết lập môi trường**
+Bạn cần có một file `.env` ở thư mục gốc (BlockChainVoting) với cấu hình như sau:
+```
+EMAIL=your-email@gmail.com
+PASSWORD=your-app-password
+```
+
+**Bước 4: Biên dịch và triển khai Smart Contract**
+Khởi động Ganache trên Terminal:
 ```bash
-EMAIL=YOUR_EMAIL_ID
-PASSWORD=YOUR_PASSWORD_FOR_EMAIL_ID
+ganache --port 8545 --networkId 1337 --deterministic
 ```
-Install MetaMask extension (https://metamask.io/download.html) and make sure to have some Ether to test the application locally. Ether can be fetched from Rinkeby Faucet (https://faucet.rinkeby.io)
 
-#### Note:
-- Make sure to install Node.js v11.14.0 to make sure the app runs fine. Testing for other node versions is yet to be done.
-- MongoDB must be working in background on localhost:27017
+Mở một Terminal khác, tiến hành deploy Smart Contract lên Ganache:
+```bash
+node Ethereum/deploy_ethers.js
+```
 
-###### Please star the repo if it helped you in any way!
+**Bước 5: Khởi động Server Next.js**
+```bash
+$env:NODE_OPTIONS="--openssl-legacy-provider"; npm start
+```
 
-## Tech Stack:
+Vào trình duyệt và truy cập `http://localhost:3000` để sử dụng!
 
-- Solidity/Web3 (for writing/connecting the Blockchain contract)
-- Next.js & Semantic UI React (front-end)
-- MongoDB/ExpressJS/Node.js (back-end)
-- IPFS (file storage for images)
-
-## Screenshots of the app:
-
-Homepage of the application:
-
-![](screenshots/homepage.PNG)
-
-Company registers/logs in:
-
-![](screenshots/company_login.PNG)
-
-Company creates an election if not created:
-
-![](screenshots/create_election.PNG)
-
-Dashboard on successful election creation:
-
-![](screenshots/dashboard.PNG)
-
-List of candidates for the election (here, you can add candidates):
-
-![](screenshots/candidate_list.PNG)
-
-Candidate has been notified on the mail:
-
-![](screenshots/candidate_registeration_mail.PNG)
-
-List of voters for the election (here, you can add voters):
-
-![](screenshots/voterlist.PNG)
-
-Voters have been sent their secure usernames and passwords on the mail:
-
-![](screenshots/voter_registeration_mail.PNG)
-
-Voter login page:
-
-![](screenshots/voter_login.PNG)
-
-Successful voting scenario:
-
-![](screenshots/successful_voting.PNG)
-
-Unsuccessful voting scenario:
-
-![](screenshots/unsuccessful_voting.PNG)
-
-Notification to each candidate and voter for the winner of candidates:
-
-![](screenshots/winner_candidate_mail.PNG)
+---
+*Dự án được xây dựng nhằm mục đích tìm hiểu và ứng dụng công nghệ Blockchain trong thực tiễn.*
