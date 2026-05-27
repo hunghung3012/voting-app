@@ -5,6 +5,7 @@ const express = require('express');
 const voter = require('./routes/voter');
 const company = require('./routes/company');
 const candidate = require('./routes/candidate');
+const ai = require('./routes/ai');
 const bodyParser = require('body-parser');
 const mongoose = require('./config/database');
 const exp = express();
@@ -17,9 +18,10 @@ mongoose.connection.on('error', console.error.bind(console, 'MongoDB connection 
 exp.use(
 	bodyParser.urlencoded({
 		extended: true,
+		limit: '50mb',
 	})
 );
-exp.use(bodyParser.json());
+exp.use(bodyParser.json({ limit: '50mb' }));
 exp.get('/', function (req, res) {
 	res.redirect('/homepage');
 });
@@ -29,6 +31,8 @@ exp.use('/company', company);
 exp.use('/voter', voter);
 
 exp.use('/candidate', candidate);
+
+exp.use('/ai', ai);
 
 const app = next({
 	dev: process.env.NODE_ENV !== 'production',

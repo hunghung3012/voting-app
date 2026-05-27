@@ -23,6 +23,9 @@ class CandidateList extends Component {
     panelCandidate: null,
     search: '',
     sort: 'default',
+    cvFile: null,
+    cvFileName: '',
+    analyzing: false,
   };
 
   async componentDidMount() {
@@ -63,6 +66,66 @@ class CandidateList extends Component {
     };
   };
 
+  captureCVFile = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('Chỉ hỗ trợ file PDF.', 'warning');
+      return;
+    }
+    this.setState({ cvFile: file, cvFileName: file.name });
+  };
+
+  analyzeCV = () => {
+    const { cvFile } = this.state;
+    if (!cvFile) {
+      showToast('Vui lòng upload file CV trước.', 'warning');
+      return;
+    }
+
+    this.setState({ analyzing: true });
+    showToast('Đang phân tích CV với AI...', 'info');
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      // Convert ArrayBuffer to base64
+      const arrayBuffer = evt.target.result;
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      // Send to backend
+      const http = new XMLHttpRequest();
+      http.open('POST', '/ai/analyze-cv', true);
+      http.setRequestHeader('Content-Type', 'application/json');
+      http.onreadystatechange = () => {
+        if (http.readyState == 4) {
+          this.setState({ analyzing: false });
+          if (http.status == 200) {
+            try {
+              const r = JSON.parse(http.responseText);
+              if (r.status === 'success' && r.summary) {
+                this.setState({ cand_desc: r.summary });
+                showToast('Phân tích CV thành công!', 'success');
+              } else {
+                showToast(r.message || 'Không nhận được kết quả từ AI.', 'error');
+              }
+            } catch (e) {
+              showToast('Lỗi xử lý phản hồi.', 'error');
+            }
+          } else {
+            showToast('Lỗi kết nối server.', 'error');
+          }
+        }
+      };
+      http.send(JSON.stringify({ pdf_base64: base64 }));
+    };
+    reader.readAsArrayBuffer(cvFile);
+  };
+
   onSubmit = async () => {
     this.setState({ loading: true });
     try {
@@ -81,6 +144,8 @@ class CandidateList extends Component {
 
       const { AbiCoder } = require('web3-eth-abi');
       const abi = new AbiCoder();
+      // Giới hạn mô tả tối đa 500 ký tự để tránh tràn gas trên Blockchain
+      const descForChain = (this.state.cand_desc || '').substring(0, 500);
       const data = abi.encodeFunctionCall(
         { name: 'addCandidate', type: 'function', inputs: [
           { type: 'string', name: 'candidate_name' },
@@ -88,12 +153,12 @@ class CandidateList extends Component {
           { type: 'string', name: 'imgHash' },
           { type: 'string', name: 'email' },
         ]},
-        [this.state.cand_name, this.state.cand_desc, imgHash, email]
+        [this.state.cand_name, descForChain, imgHash, email]
       );
 
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ from, to: add, data, gas: '0x493E0' }],
+        params: [{ from, to: add, data, gas: '0xF4240' }],
       });
 
       let receipt = null, attempts = 0;
@@ -188,7 +253,7 @@ class CandidateList extends Component {
                     </div>
                   )}
                   <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>{c.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{c.desc}</p>
+                  <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'pre-line' }}>{c.desc}</p>
                   <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>Email: {c.email}</p>
                   <span className="bv-badge bv-badge-primary" style={{ marginBottom: '16px' }}>{c.votes} phiếu</span>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '12px' }}>
@@ -231,25 +296,43 @@ class CandidateList extends Component {
                   </div>
                   <div className="bv-input-group">
                     <label>CV ứng viên (PDF)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <label className="bv-btn bv-btn-outline" style={{ cursor: 'pointer' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         Upload CV
-                        <input type="file" accept=".pdf" style={{ display: 'none' }} />
+                        <input type="file" accept=".pdf" onChange={this.captureCVFile} style={{ display: 'none' }} />
                       </label>
-                      <span style={{ fontSize: '13px', color: '#94a3b8' }}>Chưa chọn file (Tính năng đang phát triển)</span>
+                      {this.state.cvFileName ? (
+                        <span style={{ fontSize: '13px', color: '#059862', fontWeight: 500 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: '-2px', marginRight: '4px' }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                          {this.state.cvFileName}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#94a3b8' }}>Chưa chọn file</span>
+                      )}
                     </div>
+                    {this.state.cvFile && (
+                      <button
+                        className="bv-btn bv-btn-pastel"
+                        style={{ marginTop: '12px', fontSize: '13px' }}
+                        onClick={this.analyzeCV}
+                        disabled={this.state.analyzing}
+                      >
+                        {this.state.analyzing ? (
+                          <><span className="bv-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span> Đang phân tích...</>
+                        ) : (
+                          <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m-7-7h6m6 0h6m-2.5-5.5l-4.24 4.24m-4.24 4.24L4.5 17.5m13-13l-4.24 4.24m-4.24 4.24L4.5 4.5"></path></svg> Phân tích CV với AI</>
+                        )}
+                      </button>
+                    )}
                   </div>
                   <div className="bv-input-group">
-                    <label>Mô tả</label>
-                    <textarea className="bv-input" rows="3" value={this.state.cand_desc} onChange={e => this.setState({ cand_desc: e.target.value })} placeholder="Mô tả về ứng viên..." />
+                    <label>Mô tả {this.state.analyzing && <span style={{ color: '#337ab7', fontSize: '12px', marginLeft: '8px' }}>AI đang xử lý...</span>}</label>
+                    <textarea className="bv-input" rows="6" value={this.state.cand_desc} onChange={e => this.setState({ cand_desc: e.target.value })} placeholder="Mô tả về ứng viên..." style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }} />
                   </div>
                   <div className="bv-input-group">
                     <label>Email *</label>
                     <input className="bv-input" id="cand_email" type="email" defaultValue="candidate@example.com" placeholder="candidate@example.com" />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '13px', color: '#64748b' }}>Verify with AI</span>
-                    <span className="bv-badge bv-badge-muted" style={{ marginLeft: 'auto' }}>Coming soon</span>
                   </div>
                 </div>
                 <div className="bv-modal-footer">
@@ -292,7 +375,7 @@ class CandidateList extends Component {
                   <span className="bv-badge bv-badge-primary" style={{ fontSize: '14px', padding: '6px 14px' }}>{panelCandidate.votes} phiếu bầu</span>
                   <div style={{ textAlign: 'left', marginTop: '32px', padding: '20px', background: '#f8fafc', borderRadius: '12px' }}>
                     <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#64748b' }}>Mô tả</h4>
-                    <p style={{ fontSize: '14px', lineHeight: 1.7 }}>{panelCandidate.desc}</p>
+                    <p style={{ fontSize: '14px', lineHeight: 1.7, whiteSpace: 'pre-line' }}>{panelCandidate.desc}</p>
                   </div>
                 </div>
               </div>
