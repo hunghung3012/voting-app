@@ -1,302 +1,315 @@
 import React, { Component } from 'react';
-import { Grid, Header, Button, Form, Input, Icon, Menu, Modal, Sidebar, Container, Card } from 'semantic-ui-react';
 import Layout from '../../components/Layout';
+import { showToast } from '../../components/Toast';
 import Cookies from 'js-cookie';
-import {Link,Router} from '../../routes';
+import { Link, Router } from '../../routes';
 import Election from '../../Ethereum/election';
-import {Helmet} from 'react-helmet';
-class VotingList extends Component { 
+import { Helmet } from 'react-helmet';
+import '../../static/styles.css';
 
-    state = {
-        election_address: Cookies.get('address'),
-        election_name: '',
-        election_description: '',
-        emailArr: [],
-        idArr: [],
-        item: [],
-    }
+class VotingList extends Component {
+  state = {
+    election_address: Cookies.get('address'),
+    election_name: '', election_description: '',
+    voters: [], search: '', showAddModal: false, showEditModal: false,
+    editId: null, editEmail: '', editName: '',
+  };
 
-    async componentDidMount() {        
-        var http = new XMLHttpRequest();
-        var url = '/voter/';        
-        var params = 'election_address='+this.state.election_address;
-        http.open("POST", url, true);
-        let email=[];
-        let id=[]
-        //Send the proper header information along with the request
-        http.setRequestHeader(
-            "Content-type",
-            "application/x-www-form-urlencoded"
-        );
-        http.onreadystatechange = function() {
-            //Call a function when the state changes.
-            if (http.readyState == 4 && http.status == 200) {
-                var responseObj = JSON.parse(http.responseText);
-                if(responseObj.status=="success") {
-                  for (let voter of responseObj.data.voters) {
-                        email.push(voter.email);
-                        id.push(voter.id);    
-                  } 
-                }                
-            }
-        };
-        http.send(params);
-        this.state.emailArr.push(email);
-        this.state.idArr.push(id);
-
-        try {
-            const add = Cookies.get('address');
-            const election = Election(add);
-            const summary = await election.methods.getElectionDetails().call();
-            this.setState({
-                election_name: summary[0],
-                election_description: summary[1]
-            });
-
-        } catch(err) {
-            console.log(err.message);
-            alert("Redirecting you to login page...");
-            Router.pushRoute('/company_login');
+  async componentDidMount() {
+    const self = this;
+    var http = new XMLHttpRequest();
+    http.open('POST', '/voter/', true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = function () {
+      if (http.readyState == 4 && http.status == 200) {
+        var r = JSON.parse(http.responseText);
+        if (r.status == 'success') {
+          self.setState({ voters: r.data.voters || [] });
         }
-        let ea = [];
-        ea = this.state.emailArr[0];
-        let ia = [];
-        ia = this.state.idArr[0];            
+      }
+    };
+    http.send('election_address=' + this.state.election_address);
+
+    try {
+      const election = Election(Cookies.get('address'));
+      const summary = await election.methods.getElectionDetails().call();
+      this.setState({ election_name: summary[0], election_description: summary[1] });
+    } catch (err) {
+      showToast('Phiên hết hạn.', 'error');
+      setTimeout(() => Router.pushRoute('/company_login'), 1500);
+    }
+  }
+
+  register = () => {
+    const email = document.getElementById('register_voter_email').value;
+    const name = document.getElementById('register_voter_name').value;
+    if (!email || !name) return showToast('Vui lòng nhập đầy đủ tên và email.', 'warning');
+    var http = new XMLHttpRequest();
+    http.open('POST', '/voter/register', true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = () => {
+      if (http.readyState == 4 && http.status == 200) {
+        var r = JSON.parse(http.responseText);
+        if (r.status == 'success') {
+          showToast('Đã thêm cử tri thành công!', 'success');
+          this.setState({ showAddModal: false });
+          setTimeout(() => window.location.reload(), 1000);
+        } else showToast(r.message, 'error');
+      }
+    };
+    http.send(`email=${email}&name=${encodeURIComponent(name)}&election_address=${this.state.election_address}&election_name=${this.state.election_name}&election_description=${this.state.election_description}`);
+  };
+
+  updateEmail = () => {
+    const email = this.state.editEmail;
+    const name = this.state.editName;
+    if (!email || !name) return showToast('Vui lòng nhập đầy đủ tên và email.', 'warning');
+    var http = new XMLHttpRequest();
+    http.open('PUT', '/voter/' + this.state.editId, true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = () => {
+      if (http.readyState == 4 && http.status == 200) {
+        showToast('Đã cập nhật email!', 'success');
+        this.setState({ showEditModal: false });
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    };
+    http.send(`email=${email}&name=${encodeURIComponent(name)}&election_name=${this.state.election_name}&election_description=${this.state.election_description}`);
+  };
+
+  deleteEmail = (id) => {
+    if (!confirm('Bạn chắc chắn muốn xóa cử tri này?')) return;
+    var http = new XMLHttpRequest();
+    http.open('DELETE', '/voter/' + id, true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = () => {
+      if (http.readyState == 4 && http.status == 200) {
+        showToast('Đã xóa cử tri!', 'success');
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    };
+    http.send();
+  };
+
+  handleImportExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Load XLSX from CDN dynamically
+    if (!window.XLSX) {
+      showToast('Đang tải thư viện xử lý Excel...', 'info');
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.onload = () => this.processExcel(file);
+      document.body.appendChild(script);
+    } else {
+      this.processExcel(file);
+    }
+  };
+
+  processExcel = (file) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = window.XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = window.XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) return showToast('File rỗng.', 'error');
         
-        let i=-1;
-        const items = ia.map(ia => {
-            i++;
-            return {
-              header: email[i],
-              description: (
-                <div>                
-                  <br />
-                  
-                  <Modal size={"tiny"} trigger={
-                      <Button basic id={ia} color="green">                        
-                        Edit
-                      </Button>
-                    }closeIcon
-                  >
-                    <Modal.Header>Edit E-mail ID</Modal.Header>
-                    <center>
-                      <Modal.Content>
-                        <Input id={`EmailVal${ia}`} placeholder='E-mail ID' style={{marginBottom: '5%',marginTop: '5%'}}/>
-                      </Modal.Content>
-                      <Modal.Actions>
-                        <Button
-                          positive
-                          icon="checkmark"
-                          labelPosition="right"
-                          content="Yes"
-                          padding="30"
-                          style={{ marginBottom: "10px" }}
-                          onClick={this.updateEmail}
-                          id={ia} 
-                        />
-                        <Button negative>No</Button>
-                      </Modal.Actions>
-                    </center>
-                  </Modal>
-                  <Button negative basic id={ia} value={ia} onClick={this.deleteEmail}>Delete</Button>
-                </div>
-              )
+        // Kiểm tra cột tên và email (không phân biệt hoa thường)
+        const firstRow = data[0];
+        const keys = Object.keys(firstRow).map(k => k.toLowerCase().trim());
+        
+        let emailKey = Object.keys(firstRow).find(k => k.toLowerCase().trim() === 'email');
+        let nameKey = Object.keys(firstRow).find(k => k.toLowerCase().trim() === 'tên' || k.toLowerCase().trim() === 'name');
+
+        if (!emailKey || !nameKey) {
+            return showToast('File Excel phải có cột "tên" và "email".', 'error');
+        }
+
+        let successCount = 0;
+        let processed = 0;
+
+        showToast(`Đang import ${data.length} cử tri...`, 'info');
+
+        data.forEach((row, index) => {
+            const email = row[emailKey];
+            const name = row[nameKey];
+
+            if (!email) {
+                processed++;
+                return;
+            }
+
+            var http = new XMLHttpRequest();
+            http.open('POST', '/voter/register', true);
+            http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+            http.onreadystatechange = () => {
+              if (http.readyState == 4) {
+                processed++;
+                if (http.status == 200) {
+                  var r = JSON.parse(http.responseText);
+                  if (r.status == 'success') successCount++;
+                }
+                
+                // Nếu đã xử lý xong dòng cuối
+                if (processed === data.length) {
+                    showToast(`Import hoàn tất! Đã thêm ${successCount} cử tri.`, 'success', 5000);
+                    setTimeout(() => window.location.reload(), 1500);
+                }
+              }
             };
+            // Send request for each
+            http.send(`email=${encodeURIComponent(email)}&election_address=${encodeURIComponent(this.state.election_address)}&election_name=${encodeURIComponent(this.state.election_name)}&election_description=${encodeURIComponent(this.state.election_description)}&name=${encodeURIComponent(name || '')}`);
         });
-        this.setState({item: items});
-    }
 
-    updateEmail = event => {
-        
-        const d = event.currentTarget.id;
-        const st = 'EmailVal'+event.currentTarget.id;
-        const a = document.getElementById(st).value;
-        const b = this.state.election_name;
-        const c = this.state.election_description;
-        //further proceed
+      } catch (err) {
+          showToast('Lỗi khi đọc file Excel', 'error');
+      }
+    };
+    reader.readAsBinaryString(file);
+    // Reset file input
+    document.getElementById('excel-upload').value = '';
+  };
 
-        var http = new XMLHttpRequest();
-        var url = '/voter/'+d;  
-        var params = 'email='+a+'&election_name='+b+'&election_description='+c;
-        http.open("PUT", url, true);
-        //Send the proper header information along with the request
-        http.setRequestHeader(
-            "Content-type",
-            "application/x-www-form-urlencoded"
-        );
-        http.onreadystatechange = function() {
-            //Call a function when the state changes.
-            if (http.readyState == 4 && http.status == 200) {
-                var responseObj = JSON.parse(http.responseText);
-                if(responseObj.status=="success") {
-                  alert(responseObj.message);
-                }
-            }
-        };
-        http.send(params);
-    }
+  render() {
+    const { voters, search, showAddModal, showEditModal, editEmail, election_name, election_description } = this.state;
+    const filtered = search ? voters.filter(v => v.email.toLowerCase().includes(search.toLowerCase())) : voters;
 
-    deleteEmail = event => {
-        //further proceed
-
-        var http = new XMLHttpRequest();
-        var url = '/voter/'+event.currentTarget.value;        
-        http.open("DELETE", url, true);
-        //Send the proper header information along with the request
-        http.setRequestHeader(
-            "Content-type",
-            "application/x-www-form-urlencoded"
-        );
-        http.onreadystatechange = function() {
-            //Call a function when the state changes.
-            if (http.readyState == 4 && http.status == 200) {
-                var responseObj = JSON.parse(http.responseText);
-                if(responseObj.status=="success") {
-                  alert(responseObj.message);
-                }                
-            }
-        };
-        http.send();
-    }
-
-    renderTable = () => {
-        return (<Card.Group items={this.state.item}/>)
-    } 
-
-    GridExampleGrid = () => <Grid>{columns}</Grid>
-    SidebarExampleVisible = () => (
-      <Sidebar.Pushable>
-        <Sidebar as={Menu} animation='overlay' icon='labeled' inverted vertical visible width='thin' style={{ backgroundColor: 'white', borderWidth: "10px" }}>
-        <Menu.Item as='a' style={{ color: 'grey' }} >
-        <h2>MENU</h2><hr/>
-        </Menu.Item>      
-        <Link route={`/election/${Cookies.get('address')}/company_dashboard`}>
-        <a>
-          <Menu.Item style={{ color: 'grey', fontColor: 'grey' }}>
-            <Icon name='dashboard'/>
-            Dashboard
-          </Menu.Item>
-          </a>
-          </Link>
-          <Link route={`/election/${Cookies.get('address')}/candidate_list`}>
-          <a>
-          <Menu.Item as='a' style={{ color: 'grey' }}>
-            <Icon name='user outline' />
-            Candidate List
-          </Menu.Item>
-          </a>
-          </Link>
-          <Link route={`/election/${Cookies.get('address')}/voting_list`}>
-          <a>
-          <Menu.Item as='a' style={{ color: 'grey' }}>
-            <Icon name='list' />
-            Voter List
-          </Menu.Item>
-          </a>
-          </Link>
-          <hr/>
-          <Button onClick={this.signOut} style={{backgroundColor: 'white'}}>
-          <Menu.Item as='a' style={{ color: 'grey' }}>
-            <Icon name='sign out' />
-            Sign Out
-          </Menu.Item>       
-          </Button>  
-        </Sidebar>
-      </Sidebar.Pushable>
-    )
-    signOut() {
-        Cookies.remove('address');
-        Cookies.remove('company_email');
-        Cookies.remove('company_id');
-        alert("Logging out.");
-        Router.pushRoute('/homepage');
-    }
-
-    register = event => {
-
-		const email = document.getElementById('register_voter_email').value;
-    
-		var http = new XMLHttpRequest();
-        var url = "/voter/register";
-        var params = "email=" + email+"&election_address=" + this.state.election_address+ "&election_name=" + this.state.election_name + "&election_description=" + this.state.election_description;
-        http.open("POST", url, true);
-        //Send the proper header information along with the request
-        http.setRequestHeader(
-            "Content-type",
-            "application/x-www-form-urlencoded"
-        );
-        http.onreadystatechange = function() {
-            //Call a function when the state changes.
-            if (http.readyState == 4 && http.status == 200) {
-                var responseObj = JSON.parse(http.responseText);
-                if(responseObj.status=="success") {
-                  alert(responseObj.message);                  
-                }
-                else {
-                  alert(responseObj.message);
-                }
-            }
-        };
-    	http.send(params);
-	}
-	
-  render() {      
     return (
       <div>
-          <Helmet>
-            <title>Voting list</title>
-            <link rel="shortcut icon" type="image/x-icon" href="../../static/logo3.png" />
-          </Helmet>
-        <Grid>
-          <Grid.Row>
-            <Grid.Column width={2}>
-              {this.SidebarExampleVisible()}
-            </Grid.Column>
-            <Layout>                      
-              <br />
-              <br />
-              <Grid.Column width={14} style={{ minHeight: '630px' }}>
-                <Grid.Column style={{ float: 'left', width: '60%' }}>
-                  <Header as='h2' color='black'>
-                    Voter List
-              </Header>
-                  <Container>                      
-                      <table>
-                      {this.renderTable()}
-                      </table>                                        
-                  </Container>
-                </Grid.Column>
-                <Grid.Column style={{ float: 'right', width: '30%' }}>
-                  <Container style={{}}>
-                    <Header as='h2' color='black'>
-                      Register Voter
-                       </Header>
-                    <Card style={{ width: '100%' }}>
-                      <br/>
-                      <Form.Group size='large' style={{ marginLeft: '15%', marginRight: '15%' }} >
-                        <Form.Input
-						style={{marginTop: '10px'}}
-                          fluid
-                          id='register_voter_email'
-                          label='Email:'
-                          placeholder='Enter your email.'
-                          textAlign='center'
-                        />
+        <Helmet><title>Voters — BlockVotes</title></Helmet>
+        <Layout>
+          <div style={{ marginBottom: '24px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: 4 }}>Danh sách Cử tri</h1>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>{election_name} — {election_description}</p>
+          </div>
 
-                        <br /><br />
-                        <Button primary style={{ Bottom: '10px', marginBottom: '15px' }} onClick={this.register}>Register</Button>
-                      </Form.Group>
-                    </Card>
-                  </Container>
-                </Grid.Column>                
-              </Grid.Column>
-            </Layout>
-          </Grid.Row>
-        </Grid>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <button 
+                    className="bv-btn bv-btn-pastel-blue" 
+                    onClick={() => this.setState({ showAddModal: true })}
+                >
+                    + Thêm Cử Tri
+                </button>
+
+                <input 
+                    type="file" 
+                    id="excel-upload" 
+                    accept=".xlsx, .xls, .csv" 
+                    style={{ display: 'none' }} 
+                    onChange={this.handleImportExcel}
+                />
+                <button 
+                    className="bv-btn bv-btn-pastel" 
+                    onClick={() => document.getElementById('excel-upload').click()}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Import File Excel
+                </button>
+                <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '4px' }}>
+                    * Excel cần cột <strong>tên</strong> & <strong>email</strong>
+                </span>
+            </div>
+
+            <div style={{ width: '100%' }}>
+                <div className="bv-search" style={{ width: '100%' }}>
+                  <input placeholder="Tìm theo email..." value={search} onChange={e => this.setState({ search: e.target.value })} style={{ paddingLeft: '14px', width: '100%' }} />
+                </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <table className="bv-table">
+            <thead>
+              <tr><th>#</th><th>Tên</th><th>Email</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Chưa có cử tri nào</td></tr>
+              ) : filtered.map((v, i) => (
+                <tr key={i}>
+                  <td style={{ color: '#94a3b8' }}>{i + 1}</td>
+                  <td><strong>{v.name}</strong></td>
+                  <td>{v.email}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="bv-btn bv-btn-outline" style={{ fontSize: '12px', padding: '6px 12px' }}
+                        onClick={() => this.setState({ showEditModal: true, editId: v.id, editEmail: v.email, editName: v.name || '' })}>
+                        Sửa
+                      </button>
+                      <button className="bv-btn bv-btn-danger" style={{ fontSize: '12px', padding: '6px 12px' }}
+                        onClick={() => this.deleteEmail(v.id)}>
+                        Xóa
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Add Modal */}
+          {showAddModal && (
+            <div className="bv-modal-overlay" onClick={() => this.setState({ showAddModal: false })}>
+              <div className="bv-modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+                <div className="bv-modal-header">
+                  <h2>Đăng ký Cử tri</h2>
+                  <button className="bv-modal-close" onClick={() => this.setState({ showAddModal: false })}>✕</button>
+                </div>
+                <div className="bv-modal-body">
+                  <div className="bv-input-group">
+                    <label>Tên cử tri *</label>
+                    <input className="bv-input" id="register_voter_name" type="text" placeholder="Nguyễn Văn A" />
+                  </div>
+                  <div className="bv-input-group">
+                    <label>Email *</label>
+                    <input className="bv-input" id="register_voter_email" type="email" defaultValue="voter@example.com" placeholder="voter@example.com" />
+                  </div>
+                </div>
+                <div className="bv-modal-footer">
+                  <button className="bv-btn bv-btn-outline" onClick={() => this.setState({ showAddModal: false })}>Hủy</button>
+                  <button className="bv-btn bv-btn-primary" onClick={this.register}>Đăng ký</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {showEditModal && (
+            <div className="bv-modal-overlay" onClick={() => this.setState({ showEditModal: false })}>
+              <div className="bv-modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+                <div className="bv-modal-header">
+                  <h2>Sửa Email Cử tri</h2>
+                  <button className="bv-modal-close" onClick={() => this.setState({ showEditModal: false })}>✕</button>
+                </div>
+                <div className="bv-modal-body">
+                  <div className="bv-input-group">
+                    <label>Tên cử tri mới</label>
+                    <input className="bv-input" value={this.state.editName} onChange={e => this.setState({ editName: e.target.value })} />
+                  </div>
+                  <div className="bv-input-group">
+                    <label>Email mới</label>
+                    <input className="bv-input" value={editEmail} onChange={e => this.setState({ editEmail: e.target.value })} />
+                  </div>
+                </div>
+                <div className="bv-modal-footer">
+                  <button className="bv-btn bv-btn-outline" onClick={() => this.setState({ showEditModal: false })}>Hủy</button>
+                  <button className="bv-btn bv-btn-primary" onClick={this.updateEmail}>Lưu thay đổi</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Layout>
       </div>
     );
   }
 }
 
-
-export default VotingList
+export default VotingList;

@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
-import { Button, Form, Grid, Header, Segment, Icon, Message } from 'semantic-ui-react';
 import { Router } from '../../routes';
 import Cookies from 'js-cookie';
+import { Helmet } from 'react-helmet';
+import ToastContainer, { showToast } from '../../components/Toast';
+import '../../static/styles.css';
 
 const FACTORY_ADDRESS = '0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab';
 const FACTORY_ABI = [
@@ -117,84 +119,119 @@ class LoginForm extends Component {
 
         } catch (err) {
             this.setState({ loading: false, errorMess: err.message || String(err), statusMsg: '' });
+            showToast(err.message || String(err), 'error');
         }
     };
-
-    LoginForm = () => (
-        <div className="login-form">
-            <style JSX>{`
-                .login-form {
-                    width:100%;
-                    height:100%;
-                    position:absolute;
-                    background: url('../../static/blockchain.jpg') no-repeat;
-                } 
-              `}</style>
-
-            <Grid textAlign="center" style={{ height: '100%' }} verticalAlign="middle">
-                <Grid.Column style={{ maxWidth: 420 }}>
-                    <Form size="large">
-                        <Segment>
-                            <Header as="h2" color="black" textAlign="center" style={{ marginTop: 10 }}>
-                                Create an election!
-                            </Header>
-                            <Form.Input
-                                fluid
-                                iconPosition="left"
-                                icon="address card outline"
-                                placeholder="Election Name"
-                                style={{ padding: 5 }}
-                                value={this.state.election_name}
-                                onChange={event => this.setState({ election_name: event.target.value })}
-                                required={true}
-                            />
-                            <Form.TextArea
-                                required={true}
-                                style={{ marginBottom: '10px', minHeight: 60 }}
-                                placeholder="Election Description"
-                                value={this.state.election_description}
-                                onChange={event => this.setState({ election_description: event.target.value })}
-                            />
-                            {this.state.statusMsg && (
-                                <Message info>
-                                    <Icon name="spinner" loading />
-                                    {this.state.statusMsg}
-                                </Message>
-                            )}
-                            {this.state.errorMess && (
-                                <Message negative>
-                                    <Message.Header>Error</Message.Header>
-                                    <p>{this.state.errorMess}</p>
-                                </Message>
-                            )}
-                            <Button
-                                color="blue"
-                                fluid
-                                size="large"
-                                style={{ marginBottom: 15 }}
-                                onClick={this.signin}
-                                loading={this.state.loading}
-                                disabled={this.state.loading}
-                            >
-                                Submit
-                            </Button>
-                            <Message icon info>
-                                <Icon name="exclamation circle" />
-                                <Message.Header>Note: </Message.Header>
-                                <Message.Content>MetaMask will popup to confirm the transaction.</Message.Content>
-                            </Message>
-                        </Segment>
-                    </Form>
-                </Grid.Column>
-            </Grid>
-        </div>
-    );
 
     render() {
         return (
             <div>
-                <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css" />
-                {this.LoginForm()}
+                <Helmet><title>Create Election — BlockVotes</title></Helmet>
+                <ToastContainer />
+                <div style={{ 
+                    minHeight: '100vh', 
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 58, 138, 0.85)), url("../../static/blockchain.jpg") no-repeat center center',
+                    backgroundSize: 'cover',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    padding: '24px',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    {/* Decorative background nodes (optional touch for the blockchain theme) */}
+                    <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '300px', height: '300px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }}></div>
+                    <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '200px', height: '200px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }}></div>
+                    
+                    <div className="bv-card" style={{ maxWidth: '480px', width: '100%', padding: '40px 32px', position: 'relative', zIndex: 1 }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1E293B', marginBottom: '8px' }}>
+                                Block<span style={{ color: '#2563EB' }}>Votes</span>
+                            </h1>
+                            <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1E293B', marginBottom: '8px' }}>Create an election!</h2>
+                            <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.5' }}>
+                                Khởi tạo cuộc bầu cử phi tập trung. Dữ liệu được lưu trữ an toàn trên Blockchain.
+                            </p>
+                        </div>
+                        
+                        <form onSubmit={this.signin}>
+                            <div className="bv-input-group">
+                                <label>Tên cuộc bầu cử (Election Name)</label>
+                                <div className="bv-input-icon-wrap">
+                                    <input 
+                                        className="bv-input" 
+                                        type="text" 
+                                        required
+                                        placeholder="Ví dụ: Bầu cử ban cán sự lớp..." 
+                                        value={this.state.election_name}
+                                        onChange={e => this.setState({ election_name: e.target.value })}
+                                        style={{ paddingLeft: '14px' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bv-input-group" style={{ marginBottom: '24px' }}>
+                                <label>Mô tả chi tiết (Description)</label>
+                                <textarea 
+                                    className="bv-input" 
+                                    required
+                                    rows="4"
+                                    placeholder="Nhập mô tả cho cuộc bầu cử này..." 
+                                    value={this.state.election_description}
+                                    onChange={e => this.setState({ election_description: e.target.value })}
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+
+                            {this.state.statusMsg && (
+                                <div style={{ 
+                                    background: '#eff6ff', 
+                                    color: '#2563EB', 
+                                    padding: '12px 16px', 
+                                    borderRadius: '8px',
+                                    marginBottom: '20px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}>
+                                    {this.state.loading && <span className="bv-spinner bv-spinner-dark" style={{ width: '16px', height: '16px' }}></span>}
+                                    {this.state.statusMsg}
+                                </div>
+                            )}
+
+                            {this.state.errorMess && (
+                                <div style={{ 
+                                    background: '#fef2f2', 
+                                    color: '#ef4444', 
+                                    padding: '12px 16px', 
+                                    borderRadius: '8px',
+                                    marginBottom: '20px',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                }}>
+                                    Lỗi: {this.state.errorMess}
+                                </div>
+                            )}
+
+                            <button 
+                                type="submit"
+                                className="bv-btn bv-btn-primary bv-btn-lg bv-btn-full" 
+                                disabled={this.state.loading}
+                            >
+                                {this.state.loading ? <span className="bv-spinner"></span> : 'Submit Transaction'}
+                            </button>
+                        </form>
+
+                        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px', color: '#64748B', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <span style={{ width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#f1f5f9', color: '#64748B', fontSize: '12px', fontWeight: 'bold' }}>!</span>
+                                <i>Lưu ý: MetaMask sẽ hiện popup xác nhận.</i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }

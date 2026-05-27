@@ -1,96 +1,93 @@
 import React, { Component } from 'react';
-import { Button, Form, Grid, Header, Image, Message, Segment } from 'semantic-ui-react';
-import Cookies from 'js-cookie';
 import { Router } from '../routes';
+import Cookies from 'js-cookie';
 import { Helmet } from 'react-helmet';
+import ToastContainer, { showToast } from '../components/Toast';
+import '../static/styles.css';
 
-class LoginForm extends Component {
-	state = {
-		election_address: '',
-	};
+class VoterLogin extends Component {
+  state = { loading: false, showPw: false };
 
-	LoginForm = () => (
-		<div className="login-form">
-			<style JSX>{`
-                .login-form {
-                    width:100%;
-                    height:100%;
-                    position:absolute;
-                    background: url('/static/blockchain.jpg') no-repeat;
-                } 
-              `}</style>
+  signin = () => {
+    const email = document.getElementById('signin_email').value;
+    const password = document.getElementById('signin_password').value;
+    if (!email || !password) return showToast('Vui lòng nhập email và mật khẩu.', 'warning');
 
-			<Grid textAlign="center" style={{ height: '100%' }} verticalAlign="middle">
-				<Grid.Column style={{ maxWidth: 380 }}>
-					<Form size="large">
-						<Segment>
-							<Header as="h2" color="black" textAlign="center" style={{ marginTop: 10 }}>
-								Login
-							</Header>
-							<Form.Input
-								fluid
-								icon="user"
-								iconPosition="left"
-								placeholder="Email"
-								style={{ padding: 5 }}
-								id="signin_email"
-							/>
-							<Form.Input
-								style={{ padding: 5 }}
-								fluid
-								id="signin_password"
-								icon="lock"
-								iconPosition="left"
-								placeholder="Password"
-								type="password"
-							/>
+    this.setState({ loading: true });
+    var http = new XMLHttpRequest();
+    http.open('POST', 'voter/authenticate', true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = () => {
+      if (http.readyState == 4 && http.status == 200) {
+        var r = JSON.parse(http.responseText);
+        if (r.status == 'success') {
+          Cookies.set('voter_email', encodeURI(email));
+          Cookies.set('address', encodeURI(r.data.election_address));
+          showToast('Đăng nhập thành công!', 'success');
+          setTimeout(() => Router.pushRoute(`/election/${r.data.election_address}/vote`), 500);
+        } else {
+          this.setState({ loading: false });
+          showToast(r.message, 'error');
+        }
+      }
+    };
+    http.send('email=' + email + '&password=' + password);
+  };
 
-							<Button color="blue" fluid size="large" style={{ marginBottom: 15 }} onClick={this.signin}>
-								Submit
-							</Button>
-						</Segment>
-					</Form>
-				</Grid.Column>
-			</Grid>
-		</div>
-	);
-	signin = event => {
-		const email = document.getElementById('signin_email').value;
-		const password = document.getElementById('signin_password').value;
-		var http = new XMLHttpRequest();
-		var url = 'voter/authenticate';
-		var params = 'email=' + email + '&password=' + password;
-		http.open('POST', url, true);
-		//Send the proper header information along with the request
-		http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-		http.onreadystatechange = function () {
-			//Call a function when the state changes.
-			if (http.readyState == 4 && http.status == 200) {
-				var responseObj = JSON.parse(http.responseText);
-				if (responseObj.status == 'success') {
-					Cookies.set('voter_email', encodeURI(email));
-					Cookies.set('address', encodeURI(responseObj.data.election_address));
-					Router.pushRoute(`/election/${responseObj.data.election_address}/vote`);
-				} else {
-					alert(responseObj.message);
-				}
-			}
-		};
-		http.send(params);
-	};
+  render() {
+    const { loading, showPw } = this.state;
+    return (
+      <div>
+        <Helmet><title>Voter Login — BlockVotes</title></Helmet>
+        <ToastContainer />
+        <div className="bv-auth">
+          {/* Left Panel - Purple variant */}
+          <div className="bv-auth-left purple">
+            <h1>Block<span style={{ color: '#a78bfa' }}>Votes</span></h1>
+            <p>Cổng bỏ phiếu dành cho cử tri — mỗi phiếu bầu đều được ghi lại an toàn trên Blockchain.</p>
+            <ul className="bv-auth-features">
+              <li>Bỏ phiếu an toàn, không thể gian lận</li>
+              <li>Mỗi cử tri chỉ được vote 1 lần duy nhất</li>
+              <li>Kết quả bầu cử minh bạch, có thể kiểm chứng</li>
+              <li>Nhận thông báo kết quả qua email</li>
+            </ul>
+          </div>
 
-	render() {
-		return (
-			<div>
-				<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css" />
-				<Helmet>
-					<title>Voter login</title>
-					<link rel="shortcut icon" type="image/x-icon" href="../../static/logo3.png" />
-				</Helmet>
-				{this.LoginForm()}
-			</div>
-		);
-	}
+          {/* Right Panel */}
+          <div className="bv-auth-right">
+            <div className="bv-auth-form">
+              <h2>Đăng nhập Cử tri</h2>
+              <p className="auth-subtitle">Nhập thông tin đã được cấp bởi ban tổ chức bầu cử.</p>
+
+              <div className="bv-input-group">
+                <label>Email</label>
+                <div className="bv-input-icon-wrap">
+                  <input className="bv-input" id="signin_email" type="email" placeholder="voter@example.com" style={{ paddingLeft: '14px' }} />
+                </div>
+              </div>
+              <div className="bv-input-group">
+                <label>Mật khẩu</label>
+                <div className="bv-input-pw-wrap">
+                  <input className="bv-input" id="signin_password" type={showPw ? 'text' : 'password'} placeholder="••••••••" />
+                  <button className="pw-toggle" type="button" onClick={() => this.setState({ showPw: !showPw })}>
+                    {showPw ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+              <button className="bv-btn bv-btn-secondary bv-btn-lg bv-btn-full" onClick={this.signin} disabled={loading}>
+                {loading ? <span className="bv-spinner"></span> : 'Sign In'}
+              </button>
+              <div className="bv-auth-switch" style={{ marginTop: '24px' }}>
+                <p style={{ fontSize: '13px', color: '#94a3b8' }}>
+                  Liên hệ ban tổ chức bầu cử để được đăng ký tài khoản.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
 
-export default LoginForm;
+export default VoterLogin;

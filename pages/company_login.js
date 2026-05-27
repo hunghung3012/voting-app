@@ -1,227 +1,190 @@
-import React, { Component } from "react";
-import {
-  Button,
-  Divider,
-  Transition,
-  Form,
-  Grid,
-  Segment,
-  Message
-} from "semantic-ui-react";
-import {Router} from '../routes'
-import web3 from "../Ethereum/web3";
-import Election_Factory from "../Ethereum/election_factory";
+import React, { Component } from 'react';
+import { Router } from '../routes';
 import Cookies from 'js-cookie';
-import {Helmet} from 'react-helmet'
+import { Helmet } from 'react-helmet';
+import ToastContainer, { showToast } from '../components/Toast';
+import '../static/styles.css';
 
-class DividerExampleVerticalForm extends Component {
-  state = { visible: true, email: ''};
-  toggleVisibility = () => this.setState({ visible: !this.state.visible });  
-  returnBackImage = () => (
-    <div className='login-form'>
-    <style JSX>{`
-        .login-form {
-            width:100vw;
-            height:100vh;
-            position:absolute; 
-            background: url('../../static/blockchain.jpg') no-repeat;
-            z-index: -1;
-        }
-      `}</style>
-  </div>
-  )
-  
-  signup = event => {
+class CompanyLogin extends Component {
+  state = {
+    activeTab: 'signin',
+    loading: false,
+    showPw: false,
+    showPw2: false,
+  };
+
+  signup = () => {
     const email = document.getElementById('signup_email').value;
     const password = document.getElementById('signup_password').value;
-    const repeat_password = document.getElementById('signup_repeat_password').value;
-    if(password!=repeat_password){
-		alert("Passwords do not match");		
-	}
-	else {
+    const repeat = document.getElementById('signup_repeat_password').value;
+    if (!email || !password) return showToast('Vui lòng nhập đầy đủ thông tin.', 'warning');
+    if (password !== repeat) return showToast('Mật khẩu xác nhận không khớp!', 'error');
+
+    this.setState({ loading: true });
     var http = new XMLHttpRequest();
-    var url = 'company/register';
-    var params = 'email='+email+'&password='+password;
-    http.open('POST', url, true);
-    //Send the proper header information along with the request
+    http.open('POST', 'company/register', true);
     http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    http.onreadystatechange = function() {//Call a function when the state changes.
-        if(http.readyState == 4 && http.status == 200) {
-            var responseObj = JSON.parse(http.responseText)
-            if(responseObj.status=="success") {					                    
-                    Cookies.set('company_email', encodeURI(responseObj.data.email));                    				                    
-                    alert("Added!");
-                    Router.pushRoute(`/company_login`);
-			}
-			else {
-				alert(responseObj.message);
-			}
-		}
-	
-    }
-	http.send(params); 
-	}
-  }
-  signin =  async event => {
-      const email = document.getElementById('signin_email').value;
-      const password = document.getElementById("signin_password").value;
-      var http = new XMLHttpRequest();
-      var url = "company/authenticate";
-      var params = "email=" + email + "&password=" + password;
-      http.open("POST", url, true);
-      http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-      http.onreadystatechange = async function() {
-        if (http.readyState == 4 && http.status == 200) {
-		  var responseObj = JSON.parse(http.responseText);
-		  if(responseObj.status=="success") {
-            Cookies.set('company_id', encodeURI(responseObj.data.id));
-            Cookies.set('company_email', encodeURI(responseObj.data.email));
-            // Now call blockchain with the real email
-            try {
-              const web3mod = (await import('../Ethereum/web3')).default;
-              const EF = (await import('../Ethereum/election_factory')).default;
-              const accounts = await web3mod.eth.getAccounts();
-              let summary;
-              try {
-                summary = await EF.methods.getDeployedElection(email).call({from: accounts[0]});
-              } catch(e) {
-                summary = ['0x0000000000000000000000000000000000000000', '', 'Create an election.'];
-              }
-              if(summary[2] == "Create an election.") {
-                Router.pushRoute(`/election/create_election`);
-              } else {
-                Cookies.set('address', summary[0]);
-                Router.pushRoute(`/election/${summary[0]}/company_dashboard`);
-              }
-            } catch(e) {
-              Router.pushRoute(`/election/create_election`);
-            }
-		  } else {
-			alert(responseObj.message);
-		  }
+    http.onreadystatechange = () => {
+      if (http.readyState == 4 && http.status == 200) {
+        var r = JSON.parse(http.responseText);
+        this.setState({ loading: false });
+        if (r.status === 'success') {
+          Cookies.set('company_email', encodeURI(r.data.email));
+          showToast('Đăng ký thành công! Hãy đăng nhập.', 'success');
+          this.setState({ activeTab: 'signin' });
+        } else {
+          showToast(r.message, 'error');
         }
-      };
-      http.send(params);
-  }
+      }
+    };
+    http.send('email=' + email + '&password=' + password);
+  };
+
+  signin = async () => {
+    const email = document.getElementById('signin_email').value;
+    const password = document.getElementById('signin_password').value;
+    if (!email || !password) return showToast('Vui lòng nhập email và mật khẩu.', 'warning');
+
+    this.setState({ loading: true });
+    var http = new XMLHttpRequest();
+    http.open('POST', 'company/authenticate', true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = async () => {
+      if (http.readyState == 4 && http.status == 200) {
+        var r = JSON.parse(http.responseText);
+        if (r.status === 'success') {
+          Cookies.set('company_id', encodeURI(r.data.id));
+          Cookies.set('company_email', encodeURI(r.data.email));
+          showToast('Đăng nhập thành công!', 'success');
+          try {
+            const web3mod = (await import('../Ethereum/web3')).default;
+            const EF = (await import('../Ethereum/election_factory')).default;
+            const accounts = await web3mod.eth.getAccounts();
+            let summary;
+            try {
+              summary = await EF.methods.getDeployedElection(email).call({ from: accounts[0] });
+            } catch (e) {
+              summary = ['0x0000000000000000000000000000000000000000', '', 'Create an election.'];
+            }
+            if (summary[2] == 'Create an election.') {
+              Router.pushRoute('/election/create_election');
+            } else {
+              Cookies.set('address', summary[0]);
+              Router.pushRoute(`/election/${summary[0]}/company_dashboard`);
+            }
+          } catch (e) {
+            Router.pushRoute('/election/create_election');
+          }
+        } else {
+          this.setState({ loading: false });
+          showToast(r.message, 'error');
+        }
+      }
+    };
+    http.send('email=' + email + '&password=' + password);
+  };
 
   render() {
-    const { visible } = this.state;
+    const { activeTab, loading, showPw, showPw2 } = this.state;
     return (
       <div>
-        <link
-          rel="stylesheet"
-          href="//cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css"
-        />
-        <Helmet>
-            <title>Company Login</title>
-        </Helmet>
-        <div>
-          {this.returnBackImage()}
+        <Helmet><title>Company Login — BlockVotes</title></Helmet>
+        <ToastContainer />
+        <div className="bv-auth">
+          {/* Left Panel */}
+          <div className="bv-auth-left">
+            <h1>Block<span style={{ color: '#60a5fa' }}>Votes</span></h1>
+            <p>Nền tảng bầu cử phi tập trung — bảo mật, minh bạch, và không thể can thiệp.</p>
+            <ul className="bv-auth-features">
+              <li>Tạo cuộc bầu cử trên Smart Contract</li>
+              <li>Quản lý ứng cử viên và cử tri dễ dàng</li>
+              <li>Theo dõi kết quả bỏ phiếu real-time</li>
+              <li>Gửi email thông báo tự động</li>
+            </ul>
+          </div>
 
-          <Button.Group style={{ marginLeft: "43%" }}>
-            <Button
-              primary
-              content={visible ? "Sign in" : "Sign Up"}
-              onClick={this.toggleVisibility}
-            />
-          </Button.Group>
-          <Divider style={{ zIndex: "-10" }} />
-          <Grid className="grid1">
-            <Grid.Row>
-              <Grid.Column
-                width={5}
-                style={{ marginLeft: "33%", marginTop: "10%" }}
-                verticalAlign="middle"
-              >
-                <Segment placeholder className="segment">
-                  <Transition
-                    visible={!this.state.visible}
-                    animation="scale"
-                    duration={300}
-                  >
-                    <Form size="large">
-                      <h3 style={{ textAlign: "center" }}>Sign in</h3>
-                      <Form.Input
-                        fluid
-                        id="signin_email"
-                        icon="user"
-                        iconPosition="left"
-                        placeholder="Email"
-                        style={{ padding: 5 }}
-                      />
-                      <Form.Input
-                        style={{ padding: 5 }}
-                        fluid
-                        id="signin_password"
-                        icon="lock"
-                        iconPosition="left"
-                        placeholder="Password"
-                        type="password"
-                      />
+          {/* Right Panel */}
+          <div className="bv-auth-right">
+            <div className="bv-auth-form">
+              <div className="bv-auth-tabs">
+                <div className={`bv-auth-tab ${activeTab === 'signin' ? 'active' : ''}`}
+                  onClick={() => this.setState({ activeTab: 'signin' })}>
+                  Sign In
+                </div>
+                <div className={`bv-auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
+                  onClick={() => this.setState({ activeTab: 'signup' })}>
+                  Sign Up
+                </div>
+              </div>
 
-                      <Button
-                        onClick={this.signin}
-                        color="blue"
-                        fluid
-                        size="large"
-                        style={{ marginBottom: 15 }}
-                      >
-                        Submit
-                      </Button>
-                    </Form>
-                  </Transition>
-
-                  <Transition
-                    visible={this.state.visible}
-                    animation="scale"
-                    duration={300}
-                  >
-                    <Form size="large">
-                      <h3 style={{ textAlign: "center" }}>Sign up</h3>
-                      <Form.Input
-                        fluid
-                        id="signup_email"
-                        icon="user"
-                        iconPosition="left"
-                        placeholder="Email"
-                        style={{ padding: 5 }}
-                      />
-                      <Form.Input
-                        style={{ padding: 5 }}
-                        fluid
-                        id="signup_password"
-                        icon="lock"
-                        iconPosition="left"
-                        placeholder="Password"
-                        type="password"
-                      />
-                      <Form.Input
-                        style={{ padding: 5 }}
-                        fluid
-                        id="signup_repeat_password"
-                        icon="lock"
-                        iconPosition="left"
-                        placeholder="Repeat Password"
-                        type="password"
-                      />
-                      <Button
-                        onClick={this.signup}
-                        color="blue"
-                        fluid
-                        size="large"
-                        style={{ marginBottom: 15 }}
-                      >
-                        Submit
-                      </Button>                      
-                    </Form>
-                  </Transition>
-                </Segment>
-              </Grid.Column>
-            </Grid.Row>
-          </Grid>
+              {activeTab === 'signin' ? (
+                <div>
+                  <h2>Chào mừng trở lại</h2>
+                  <p className="auth-subtitle">Đăng nhập để quản lý cuộc bầu cử của bạn.</p>
+                  <div className="bv-input-group">
+                    <label>Email</label>
+                    <div className="bv-input-icon-wrap">
+                      <input className="bv-input" id="signin_email" type="email" placeholder="company@example.com" style={{ paddingLeft: '14px' }} />
+                    </div>
+                  </div>
+                  <div className="bv-input-group">
+                    <label>Mật khẩu</label>
+                    <div className="bv-input-pw-wrap">
+                      <input className="bv-input" id="signin_password" type={showPw ? 'text' : 'password'} placeholder="••••••••" />
+                      <button className="pw-toggle" type="button" onClick={() => this.setState({ showPw: !showPw })}>
+                        {showPw ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+                  <button className="bv-btn bv-btn-primary bv-btn-lg bv-btn-full" onClick={this.signin} disabled={loading}>
+                    {loading ? <span className="bv-spinner"></span> : 'Sign In'}
+                  </button>
+                  <div className="bv-auth-switch">
+                    Chưa có tài khoản? <a onClick={() => this.setState({ activeTab: 'signup' })}>Đăng ký →</a>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <h2>Tạo tài khoản</h2>
+                  <p className="auth-subtitle">Đăng ký để bắt đầu tạo cuộc bầu cử.</p>
+                  <div className="bv-input-group">
+                    <label>Email</label>
+                    <div className="bv-input-icon-wrap">
+                      <input className="bv-input" id="signup_email" type="email" placeholder="company@example.com" style={{ paddingLeft: '14px' }} />
+                    </div>
+                  </div>
+                  <div className="bv-input-group">
+                    <label>Mật khẩu</label>
+                    <div className="bv-input-pw-wrap">
+                      <input className="bv-input" id="signup_password" type={showPw ? 'text' : 'password'} placeholder="••••••••" />
+                      <button className="pw-toggle" type="button" onClick={() => this.setState({ showPw: !showPw })}>
+                        {showPw ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bv-input-group">
+                    <label>Xác nhận mật khẩu</label>
+                    <div className="bv-input-pw-wrap">
+                      <input className="bv-input" id="signup_repeat_password" type={showPw2 ? 'text' : 'password'} placeholder="••••••••" />
+                      <button className="pw-toggle" type="button" onClick={() => this.setState({ showPw2: !showPw2 })}>
+                        {showPw2 ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+                  <button className="bv-btn bv-btn-primary bv-btn-lg bv-btn-full" onClick={this.signup} disabled={loading}>
+                    {loading ? <span className="bv-spinner"></span> : 'Create Account'}
+                  </button>
+                  <div className="bv-auth-switch">
+                    Đã có tài khoản? <a onClick={() => this.setState({ activeTab: 'signin' })}>Đăng nhập →</a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 }
-export default DividerExampleVerticalForm;
+
+export default CompanyLogin;

@@ -8,6 +8,10 @@ const VoterSchema = new Schema ({
         type: String,
         required: true,
     },
+    name: {
+        type: String,
+        default: 'Không tên'
+    },
     password: {
         type: String,
         required: true

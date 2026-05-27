@@ -20,6 +20,7 @@ module.exports = {
 						VoterModel.create(
 							{
 								email: req.body.email,
+								name: req.body.name || 'Không tên',
 								password: req.body.email,
 								election_address: req.body.election_address,
 							},
@@ -115,7 +116,7 @@ module.exports = {
 		VoterModel.find({ election_address: req.body.election_address }, function (err, voters) {
 			if (err) cb(err);
 			else {
-				for (let voter of voters) voterList.push({ id: voter._id, email: voter.email });
+				for (let voter of voters) voterList.push({ id: voter._id, email: voter.email, name: voter.name });
 
 				count = voterList.length;
 
@@ -142,7 +143,7 @@ module.exports = {
 					console.log('voterID:' + req.params.voterId);
 					VoterModel.findByIdAndUpdate(
 						req.params.voterId,
-						{ email: req.body.email, password: password },
+						{ email: req.body.email, password: password, name: req.body.name || 'Không tên' },
 						function (err, voter) {
 							if (err) cb(err);
 							console.log('update method object:' + voter);
