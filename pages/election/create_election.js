@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet';
 import ToastContainer, { showToast } from '../../components/Toast';
 import '../../static/styles.css';
 
-const FACTORY_ADDRESS = '0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab';
+const FACTORY_ADDRESS = '0x48ecA5D131eA586d88D76C6970568DA602FF91AF';
 const FACTORY_ABI = [
     {"constant":false,"inputs":[{"internalType":"string","name":"email","type":"string"},{"internalType":"string","name":"election_name","type":"string"},{"internalType":"string","name":"election_description","type":"string"}],"name":"createElection","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},
     {"constant":true,"inputs":[{"internalType":"string","name":"email","type":"string"}],"name":"getDeployedElection","outputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"string","name":"","type":"string"},{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"}

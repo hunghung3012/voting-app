@@ -9,7 +9,7 @@ const path = require('path');
 const eF = JSON.parse(fs.readFileSync(path.join(__dirname, 'Build/ElectionFact.json'), 'utf8'));
 
 // Ganache deterministic account 0 private key
-const PRIVATE_KEY = '0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d';
+const PRIVATE_KEY = '0xad7822f534d30f229b9d34ee4cbf3b4a80893ddb7d875b24424cd52dfaeea1a9';
 const GANACHE_URL  = 'http://127.0.0.1:8545';
 const GANACHE_NETWORK = { chainId: 1337, name: 'ganache' };
 

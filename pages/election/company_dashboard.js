@@ -27,6 +27,9 @@ class CompanyDashboard extends Component {
     voteHistory: [],
     historySearch: '',
     historySort: 'newest',
+    is_ended: false,
+    winner_name: '',
+    winner_votes: 0,
   };
 
   async componentDidMount() {
@@ -59,8 +62,19 @@ class CompanyDashboard extends Component {
           voteHistory: histData.history,
         });
       }
+
+      // Lấy trạng thái election từ Meta DB
+      const metaRes = await fetch('/company/meta/' + electionAddress);
+      const metaData = await metaRes.json();
+      if (metaData.status === 'success') {
+        this.setState({ 
+          is_ended: metaData.is_ended, 
+          winner_name: metaData.winner_name,
+          winner_votes: metaData.winner_votes
+        });
+      }
     } catch (e) {
-      console.log('voteHistory error:', e.message);
+      console.log('API error:', e.message);
     }
 
     try {
@@ -105,12 +119,19 @@ class CompanyDashboard extends Component {
 
       const winnerName = candDecoded[0], winnerEmail = candDecoded[4], winnerVotes = candDecoded[3];
 
+      // Ghi Meta state
+      await fetch('/company/end_election', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ election_address: add, winner_name: winnerName, winner_votes: winnerVotes })
+      });
+
       const http = new XMLHttpRequest();
       http.open('POST', '/voter/resultMail', true);
       http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       http.onreadystatechange = () => {
         if (http.readyState == 4) {
-          this.setState({ loading: false });
+          this.setState({ loading: false, is_ended: true, winner_name: winnerName, winner_votes: winnerVotes });
           showToast(`Kết thúc! Người thắng: ${winnerName} (${winnerVotes} phiếu)`, 'success', 6000);
         }
       };
@@ -188,13 +209,31 @@ class CompanyDashboard extends Component {
               <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: 4 }}>Bảng Điều Khiển</h1>
               <p style={{ color: '#64748b', fontSize: '14px' }}>{election_name} — {election_desc}</p>
             </div>
-            <button className="bv-btn bv-btn-danger" onClick={() => this.setState({ showConfirm: true })} disabled={loading}>
-              {loading ? <span className="bv-spinner"></span> : 'Kết thúc bầu cử'}
-            </button>
+            {!this.state.is_ended && (
+              <button className="bv-btn bv-btn-danger" onClick={() => this.setState({ showConfirm: true })} disabled={loading}>
+                {loading ? <span className="bv-spinner"></span> : 'Kết thúc bầu cử'}
+              </button>
+            )}
           </div>
 
-          {/* Stat Cards */}
-          <div className="bv-grid bv-grid-4" style={{ marginBottom: '24px' }}>
+          {/* Nếu cuộc bầu cử đã kết thúc */}
+          {this.state.is_ended ? (
+            <div className="bv-card" style={{ textAlign: 'center', padding: '60px 20px', borderLeft: '4px solid #10B981', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', borderRadius: '50%', background: '#ecfdf5', color: '#10B981', marginBottom: '24px' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+              </div>
+              <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Cuộc bầu cử đã kết thúc</h2>
+              <p style={{ fontSize: '16px', color: '#64748b', marginBottom: '32px' }}>Người chiến thắng chung cuộc</p>
+              
+              <div style={{ display: 'inline-block', background: '#f8fafc', padding: '24px 48px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '32px', fontWeight: 800, color: '#10B981', marginBottom: '8px' }}>{this.state.winner_name}</div>
+                <div style={{ fontSize: '15px', color: '#475569' }}>Tổng số phiếu: <strong>{this.state.winner_votes}</strong></div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Stat Cards */}
+              <div className="bv-grid bv-grid-4" style={{ marginBottom: '24px' }}>
             <div className="bv-stat-card" style={{ borderLeftColor: '#2563EB' }}>
               <div className="bv-stat-icon" style={{ background: '#eff6ff', color: '#2563EB' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -299,6 +338,8 @@ class CompanyDashboard extends Component {
               )}
             </div>
           </div>
+          </>
+          )}
 
           {/* Confirm Dialog */}
           {showConfirm && (

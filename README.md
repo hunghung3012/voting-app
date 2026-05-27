@@ -23,7 +23,7 @@ Dự án này là một ứng dụng Web phi tập trung (DApp) cung cấp một
 ### 1. Yêu cầu hệ thống
 * Node.js (Phiên bản v22 hoặc tương đương)
 * MongoDB đang chạy ở cổng mặc định `27017`
-* Ganache CLI hoặc Ganache UI đang chạy ở cổng `8545` (Chain ID `1337`)
+* Ganache UI đang chạy ở cổng `8545` (Network ID `1337`)
 * Ví MetaMask extension cài đặt trên trình duyệt
 
 ### 2. Các bước cài đặt
@@ -47,22 +47,26 @@ PASSWORD=your-app-password
 ```
 
 **Bước 4: Biên dịch và triển khai Smart Contract**
-Khởi động Ganache trên Terminal:
-```bash
-ganache --port 8545 --networkId 1337 --deterministic
-```
+Mở phần mềm Ganache UI, tạo một Workspace mới (New Workspace) và cấu hình Server chạy ở cổng `8545`, Network ID là `1337`.
 
-Mở một Terminal khác, tiến hành deploy Smart Contract lên Ganache:
+Sau đó, mở Terminal tại thư mục dự án và tiến hành deploy Smart Contract lên Ganache:
 ```bash
-node Ethereum/deploy_ethers.js
+
 ```
 
 **Bước 5: Khởi động Server Next.js**
 ```bash
-$env:NODE_OPTIONS="--openssl-legacy-provider"; npm start
+npx kill-port 3000; $env:NODE_OPTIONS="--openssl-legacy-provider"; npm start
 ```
 
 Vào trình duyệt và truy cập `http://localhost:3000` để sử dụng!
-
----
+```bash
+node Ethereum/deploy_ethers.js
+npx kill-port 3000; $env:NODE_OPTIONS="--openssl-legacy-provider"; npm start
+``
+-
 *Dự án được xây dựng nhằm mục đích tìm hiểu và ứng dụng công nghệ Blockchain trong thực tiễn.*
+
+```
+node Ethereum/deploy_ethers.js
+```

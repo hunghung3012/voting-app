@@ -15,6 +15,7 @@ class VotePage extends Component {
     showPanel: false, panelCandidate: null,
     search: '', sort: 'default',
     showChat: false, chatMessages: [], chatInput: '', chatLoading: false,
+    is_ended: false, winner_name: '', winner_votes: 0
   };
 
   async componentDidMount() {
@@ -49,6 +50,22 @@ class VotePage extends Component {
           console.log('checkVoted error:', e.message);
         }
       }
+
+      // Kiểm tra trạng thái kết thúc bầu cử
+      try {
+        const metaRes = await fetch('/company/meta/' + add);
+        const metaData = await metaRes.json();
+        if (metaData.status === 'success') {
+          this.setState({
+            is_ended: metaData.is_ended,
+            winner_name: metaData.winner_name,
+            winner_votes: metaData.winner_votes
+          });
+        }
+      } catch (e) {
+        console.log('API meta error:', e.message);
+      }
+
     } catch (err) {
       console.log(err.message);
       showToast('Phiên hết hạn. Đang chuyển hướng...', 'error');
@@ -83,7 +100,12 @@ class VotePage extends Component {
         attempts++;
       }
 
-      this.setState({ voted: true, votedFor: candidateId });
+      this.setState(prevState => {
+        const updatedCandidates = prevState.candidates.map(c => 
+          c.id === candidateId ? { ...c, votes: c.votes + 1 } : c
+        );
+        return { voted: true, votedFor: candidateId, candidates: updatedCandidates };
+      });
       showToast('Phiếu bầu đã được ghi nhận trên Blockchain! ✅', 'success', 5000);
 
       // Ghi lịch sử vote vào MongoDB
@@ -209,8 +231,8 @@ class VotePage extends Component {
 
   render() {
     const { election_name, election_description, candidates, voted, votedFor, loading, votingId, showPanel, panelCandidate, search, sort } = this.state;
-    const totalVotes = candidates.reduce((a, b) => a + b.votes, 0) + (voted ? 1 : 0);
-    const maxVotes = candidates.length > 0 ? Math.max(...candidates.map(c => c.votes + (voted && votedFor === c.id ? 1 : 0))) : 0;
+    const totalVotes = candidates.reduce((a, b) => a + b.votes, 0);
+    const maxVotes = candidates.length > 0 ? Math.max(...candidates.map(c => c.votes)) : 0;
 
     let filtered = [...candidates];
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
@@ -237,24 +259,44 @@ class VotePage extends Component {
 
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 32px' }}>
           {/* Election Info Banner */}
-          <div className="bv-card" style={{ marginBottom: '24px', borderLeft: '4px solid #2563EB' }}>
+          <div className="bv-card" style={{ marginBottom: '24px', borderLeft: this.state.is_ended ? '4px solid #10B981' : '4px solid #2563EB' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{election_name}</h2>
             <p style={{ color: '#64748b', marginBottom: '8px' }}>{election_description}</p>
             <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#94a3b8' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ position: 'relative', display: 'inline-flex', width: '10px', height: '10px' }}>
-                  <span style={{ position: 'absolute', display: 'inline-flex', width: '100%', height: '100%', borderRadius: '50%', background: '#10B981', opacity: 0.75, animation: 'bvPulse 1.5s ease-in-out infinite' }}></span>
-                  <span style={{ position: 'relative', display: 'inline-flex', borderRadius: '50%', width: '10px', height: '10px', background: '#10B981' }}></span>
+              {this.state.is_ended ? (
+                <span style={{ color: '#10B981', fontWeight: 600 }}>Đã kết thúc</span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ position: 'relative', display: 'inline-flex', width: '10px', height: '10px' }}>
+                    <span style={{ position: 'absolute', display: 'inline-flex', width: '100%', height: '100%', borderRadius: '50%', background: '#10B981', opacity: 0.75, animation: 'bvPulse 1.5s ease-in-out infinite' }}></span>
+                    <span style={{ position: 'relative', display: 'inline-flex', borderRadius: '50%', width: '10px', height: '10px', background: '#10B981' }}></span>
+                  </span>
+                  Đang diễn ra
                 </span>
-                Đang diễn ra
-              </span>
+              )}
               <span>{candidates.length} ứng viên</span>
               <span>{totalVotes} phiếu đã bầu</span>
             </div>
           </div>
 
-          {/* Toolbar */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+          {this.state.is_ended ? (
+            <div className="bv-card" style={{ textAlign: 'center', padding: '60px 20px', borderTop: '4px solid #10B981' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', borderRadius: '50%', background: '#ecfdf5', color: '#10B981', marginBottom: '24px' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+              </div>
+              <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Kết quả chung cuộc</h2>
+              <p style={{ fontSize: '16px', color: '#64748b', marginBottom: '32px' }}>Người chiến thắng</p>
+              
+              <div style={{ display: 'inline-block', background: '#f8fafc', padding: '24px 48px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '32px', fontWeight: 800, color: '#10B981', marginBottom: '8px' }}>{this.state.winner_name}</div>
+                <div style={{ fontSize: '15px', color: '#475569' }}>Tổng số phiếu: <strong>{this.state.winner_votes}</strong></div>
+              </div>
+              <p style={{ marginTop: '32px', color: '#94a3b8' }}>Cảm ơn bạn đã tham gia bỏ phiếu!</p>
+            </div>
+          ) : (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
             <div className="bv-search" style={{ flex: 1, maxWidth: '320px' }}>
               <input placeholder="Tìm ứng viên..." value={search} onChange={e => this.setState({ search: e.target.value })} style={{ paddingLeft: '14px' }} />
             </div>
@@ -270,7 +312,7 @@ class VotePage extends Component {
             {filtered.map((c, idx) => {
               const color = colors[idx % colors.length];
               const isVotedCard = voted && votedFor === c.id;
-              const candidateVotes = c.votes + (isVotedCard ? 1 : 0);
+              const candidateVotes = c.votes;
               const isHighest = maxVotes > 0 && candidateVotes === maxVotes;
               
               let border = '1px solid transparent';
@@ -334,6 +376,8 @@ class VotePage extends Component {
               );
             })}
           </div>
+          </>
+          )}
         </div>
 
         {/* Detail Panel */}
