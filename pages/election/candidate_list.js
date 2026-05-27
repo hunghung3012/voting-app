@@ -244,7 +244,7 @@ class CandidateList extends Component {
                   imgSrc = localStorage.getItem(c.img);
                 }
                 return (
-                <div key={idx} className="bv-card bv-card-lift" style={{ textAlign: 'center', cursor: 'pointer' }}>
+                <div key={idx} className="bv-card bv-card-lift" style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {imgSrc ? (
                     <img src={imgSrc} className="bv-avatar bv-avatar-lg" style={{ margin: '0 auto 16px', objectFit: 'cover' }} />
                   ) : (
@@ -254,12 +254,17 @@ class CandidateList extends Component {
                   )}
                   <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>{c.name}</h3>
                   <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'pre-line' }}>{c.desc}</p>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>Email: {c.email}</p>
-                  <span className="bv-badge bv-badge-primary" style={{ marginBottom: '16px' }}>{c.votes} phiếu</span>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '12px' }}>
-                    <button className="bv-btn bv-btn-outline" style={{ fontSize: '13px' }} onClick={() => this.setState({ showPanel: true, panelCandidate: c })}>
-                      Chi tiết
-                    </button>
+                  
+                  <div style={{ marginTop: 'auto' }}>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>Email: {c.email}</p>
+                    <div style={{ marginBottom: '16px' }}>
+                      <span className="bv-badge bv-badge-primary">{c.votes} phiếu</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button className="bv-btn bv-btn-outline" style={{ fontSize: '13px' }} onClick={() => this.setState({ showPanel: true, panelCandidate: c })}>
+                        Chi tiết
+                      </button>
+                    </div>
                   </div>
                 </div>
               )})}

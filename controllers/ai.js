@@ -1,4 +1,5 @@
 const https = require('https');
+const { GoogleGenAI } = require('@google/genai');
 
 module.exports = {
 	analyzeCV: function (req, res) {
@@ -121,4 +122,56 @@ Chỉ xuất ra đúng format trên, không thêm gì khác.
 			res.json({ status: 'error', message: 'Lỗi server: ' + err.message });
 		}
 	},
+
+	chatVoter: async function (req, res) {
+		try {
+			const { message, context } = req.body;
+			const apiKey = process.env.GEMINI_API_KEY_2;
+			if (!apiKey) {
+				return res.status(500).json({ status: 'error', message: 'Chưa cấu hình GEMINI_API_KEY_2' });
+			}
+
+			const prompt = `Bạn là AI trợ lý của hệ thống Bầu cử BlockVotes. Tên bạn là BlockVotes AI.
+Nhiệm vụ của bạn là giải đáp các thắc mắc của cử tri về ứng cử viên, số phiếu, tình hình bầu cử.
+Tuyệt đối CHỈ trả lời các câu hỏi liên quan đến hệ thống bầu cử, ứng viên, hoặc thông tin trong Context được cung cấp bên dưới. Nếu người dùng hỏi các vấn đề ngoài lề (như thời tiết, kiến thức chung, code, v.v.), hãy từ chối một cách lịch sự.
+
+DỮ LIỆU BẦU CỬ HIỆN TẠI (CONTEXT):
+${context}
+
+CÂU HỎI CỦA CỬ TRI:
+${message}
+
+Hãy trả lời ngắn gọn, súc tích, thân thiện bằng tiếng Việt.`;
+
+			// Set SSE headers
+			res.setHeader('Content-Type', 'text/event-stream');
+			res.setHeader('Cache-Control', 'no-cache');
+			res.setHeader('Connection', 'keep-alive');
+			res.setHeader('X-Accel-Buffering', 'no');
+			res.flushHeaders();
+
+			const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+			const responseStream = await ai.models.generateContentStream({
+				model: 'gemini-3.5-flash',
+				contents: prompt,
+			});
+
+			for await (const chunk of responseStream) {
+				const text = chunk.text;
+				if (text) {
+					res.write(`data: ${JSON.stringify({ text })}\n\n`);
+				}
+			}
+
+			res.end();
+		} catch (err) {
+			console.log('chatVoter error:', err.message);
+			if (!res.headersSent) {
+				res.status(500).json({ status: 'error', message: 'Lỗi server: ' + err.message });
+			} else {
+				res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+				res.end();
+			}
+		}
+	}
 };
