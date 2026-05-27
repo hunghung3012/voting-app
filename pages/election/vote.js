@@ -20,6 +20,7 @@ class VotePage extends Component {
   async componentDidMount() {
     try {
       const add = Cookies.get('address');
+      const voterEmail = decodeURIComponent(Cookies.get('voter_email') || '');
       const election = Election(add);
       const summary = await election.methods.getElectionDetails().call();
       this.setState({ election_name: summary[0], election_description: summary[1] });
@@ -31,6 +32,23 @@ class VotePage extends Component {
         candidates.push({ id: i, name: cand[0], desc: cand[1], img: cand[2], votes: parseInt(cand[3]), email: cand[4] });
       }
       this.setState({ candidates });
+
+      // Kiểm tra voter đã vote chưa (từ DB), disable nút ngay từ đầu
+      if (voterEmail && add) {
+        try {
+          const res = await fetch('/voter/checkVoted', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voter_email: voterEmail, election_address: add })
+          });
+          const data = await res.json();
+          if (data.has_voted) {
+            this.setState({ voted: true, votedFor: data.candidate_id });
+          }
+        } catch (e) {
+          console.log('checkVoted error:', e.message);
+        }
+      }
     } catch (err) {
       console.log(err.message);
       showToast('Phiên hết hạn. Đang chuyển hướng...', 'error');
@@ -67,6 +85,23 @@ class VotePage extends Component {
 
       this.setState({ voted: true, votedFor: candidateId });
       showToast('Phiếu bầu đã được ghi nhận trên Blockchain! ✅', 'success', 5000);
+
+      // Ghi lịch sử vote vào MongoDB
+      const candidate = this.state.candidates.find(c => c.id === candidateId);
+      try {
+        await fetch('/voter/recordVote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            voter_email: voterEmail,
+            election_address: add,
+            candidate_id: candidateId,
+            candidate_name: candidate ? candidate.name : ''
+          })
+        });
+      } catch (e) {
+        console.log('recordVote error (non-critical):', e.message);
+      }
     } catch (err) {
       showToast('Lỗi: ' + (err.message || err), 'error');
     }
@@ -206,7 +241,13 @@ class VotePage extends Component {
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{election_name}</h2>
             <p style={{ color: '#64748b', marginBottom: '8px' }}>{election_description}</p>
             <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#94a3b8' }}>
-              <span>Đang diễn ra</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ position: 'relative', display: 'inline-flex', width: '10px', height: '10px' }}>
+                  <span style={{ position: 'absolute', display: 'inline-flex', width: '100%', height: '100%', borderRadius: '50%', background: '#10B981', opacity: 0.75, animation: 'bvPulse 1.5s ease-in-out infinite' }}></span>
+                  <span style={{ position: 'relative', display: 'inline-flex', borderRadius: '50%', width: '10px', height: '10px', background: '#10B981' }}></span>
+                </span>
+                Đang diễn ra
+              </span>
               <span>{candidates.length} ứng viên</span>
               <span>{totalVotes} phiếu đã bầu</span>
             </div>

@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import Layout from '../../components/Layout';
 import { showToast } from '../../components/Toast';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import Election from '../../Ethereum/election';
 import Cookies from 'js-cookie';
 import { Router } from '../../routes';
@@ -20,11 +20,18 @@ class CompanyDashboard extends Component {
     showConfirm: false,
     graphLabels: [],
     graphVotes: [],
+    // Biểu đồ đường 7 ngày
+    lineLabels: [],
+    lineValues: [],
+    // Lịch sử vote thực từ DB
+    voteHistory: [],
     historySearch: '',
     historySort: 'newest',
   };
 
   async componentDidMount() {
+    const electionAddress = Cookies.get('address');
+
     // Get registered voters count from MongoDB
     var http = new XMLHttpRequest();
     http.open('POST', '/voter/', true);
@@ -35,7 +42,26 @@ class CompanyDashboard extends Component {
         if (r.status == 'success') this.setState({ registeredVoters: r.count || 0 });
       }
     };
-    http.send('election_address=' + Cookies.get('address'));
+    http.send('election_address=' + electionAddress);
+
+    // Lấy lịch sử vote 7 ngày từ DB
+    try {
+      const histRes = await fetch('/voter/voteHistory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ election_address: electionAddress })
+      });
+      const histData = await histRes.json();
+      if (histData.status === 'success') {
+        this.setState({
+          lineLabels: histData.labels,
+          lineValues: histData.values,
+          voteHistory: histData.history,
+        });
+      }
+    } catch (e) {
+      console.log('voteHistory error:', e.message);
+    }
 
     try {
       const add = Cookies.get('address');
@@ -46,16 +72,12 @@ class CompanyDashboard extends Component {
       this.setState({ election_name: summary[0], election_desc: summary[1], voters: parseInt(v), candidates: parseInt(c) });
 
       let labels = [], votes = [];
-      let cList = [];
       for (let i = 0; i < c; i++) {
         const tp = await election.methods.getCandidate(i).call();
         labels.push(tp[0]);
         votes.push(parseInt(tp[3]));
-        // Tạo mock date dựa trên ID do Blockchain không lưu timestamp
-        const mockDate = new Date(Date.now() - (c - i) * 3600000); 
-        cList.push({ id: i, name: tp[0], email: tp[4], date: mockDate, dateStr: mockDate.toLocaleString('vi-VN') });
       }
-      this.setState({ graphLabels: labels, graphVotes: votes, candidatesList: cList });
+      this.setState({ graphLabels: labels, graphVotes: votes });
     } catch (err) {
       console.log(err.message);
       showToast('Phiên hết hạn. Đang chuyển hướng...', 'error');
@@ -100,12 +122,12 @@ class CompanyDashboard extends Component {
   };
 
   render() {
-    const { election_name, election_desc, voters, candidates, registeredVoters, candidatesList, loading, showConfirm, graphLabels, graphVotes, historySearch, historySort } = this.state;
+    const { election_name, election_desc, voters, candidates, registeredVoters, loading, showConfirm, graphLabels, graphVotes, lineLabels, lineValues, voteHistory, historySearch, historySort } = this.state;
     const totalVotes = graphVotes.reduce((a, b) => a + b, 0);
     const turnout = registeredVoters > 0 ? Math.round((voters / registeredVoters) * 100) : 0;
     const colors = ['#2563EB', '#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#06b6d4', '#ec4899', '#8b5cf6'];
 
-    const chartData = {
+    const barChartData = {
       labels: graphLabels,
       datasets: [{
         label: 'Số phiếu',
@@ -115,23 +137,46 @@ class CompanyDashboard extends Component {
         borderWidth: 2, borderRadius: 8, barPercentage: 0.6,
       }],
     };
+
+    const lineChartData = {
+      labels: lineLabels,
+      datasets: [{
+        label: 'Lượt bầu chọn',
+        data: lineValues,
+        borderColor: '#2563EB',
+        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+        borderWidth: 2,
+        pointBackgroundColor: '#2563EB',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+        tension: 0.4,
+      }],
+    };
+
     const chartOptions = {
       maintainAspectRatio: false, responsive: true,
       scales: { yAxes: [{ ticks: { beginAtZero: true, stepSize: 1 }, gridLines: { color: '#f1f5f9' } }], xAxes: [{ gridLines: { display: false } }] },
       legend: { display: false },
     };
 
-    // Lọc và sắp xếp lịch sử ứng cử viên
-    let historyLogs = [...candidatesList];
+    const lineChartOptions = {
+      maintainAspectRatio: false, responsive: true,
+      scales: {
+        yAxes: [{ ticks: { beginAtZero: true, stepSize: 1, precision: 0 }, gridLines: { color: '#f1f5f9' } }],
+        xAxes: [{ gridLines: { display: false } }]
+      },
+      legend: { display: true, labels: { fontColor: '#64748b', fontSize: 12 } },
+    };
+
+    // Lọc và sắp xếp lịch sử vote
+    let historyLogs = [...voteHistory];
     if (historySearch) {
-        const s = historySearch.toLowerCase();
-        historyLogs = historyLogs.filter(c => c.name.toLowerCase().includes(s) || c.email.toLowerCase().includes(s));
+      const s = historySearch.toLowerCase();
+      historyLogs = historyLogs.filter(r => r.voter_email.toLowerCase().includes(s) || (r.candidate_name || '').toLowerCase().includes(s));
     }
-    if (historySort === 'newest') {
-        historyLogs.sort((a, b) => b.date - a.date);
-    } else {
-        historyLogs.sort((a, b) => a.date - b.date);
-    }
+    // voteHistory đã sort descending từ server, nếu cần ascending thì reverse
+    if (historySort === 'oldest') historyLogs = historyLogs.reverse();
 
     return (
       <div>
@@ -176,57 +221,82 @@ class CompanyDashboard extends Component {
             </div>
           </div>
 
-          {/* Chart */}
-          <div className="bv-card" style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Phân bố phiếu bầu</h3>
-            <div style={{ height: '300px' }}>
-                {graphLabels.length > 0 ? <Bar data={chartData} options={chartOptions} /> : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+          {/* Two charts side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            {/* Bar chart - phân bố phiếu */}
+            <div className="bv-card">
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Phân bố phiếu bầu</h3>
+              <div style={{ height: '260px' }}>
+                {graphLabels.length > 0 ? <Bar data={barChartData} options={chartOptions} /> : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
                     Chưa có dữ liệu phiếu bầu
-                </div>
+                  </div>
                 )}
+              </div>
+            </div>
+
+            {/* Line chart - lượt vote 7 ngày */}
+            <div className="bv-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Lượt bầu chọn (7 ngày)</h3>
+                <span className="bv-badge bv-badge-primary">{lineValues.reduce((a, b) => a + b, 0)} lượt</span>
+              </div>
+              <div style={{ height: '260px' }}>
+                {lineLabels.length > 0 ? <Line data={lineChartData} options={lineChartOptions} /> : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+                    Chưa có lịch sử bầu cử
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* History Table */}
+          {/* History Table - lịch sử vote thực */}
           <div className="bv-card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>Lịch sử Ứng cử viên</h3>
-                    <p style={{ fontSize: '12px', color: '#64748b' }}>Danh sách các cá nhân đã tham gia ứng cử</p>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>Lịch sử Bỏ Phiếu</h3>
+                <p style={{ fontSize: '12px', color: '#64748b' }}>Danh sách cử tri đã bỏ phiếu ({voteHistory.length} lượt)</p>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div className="bv-search" style={{ width: '200px' }}>
+                  <input placeholder="Tìm kiếm..." value={historySearch} onChange={e => this.setState({ historySearch: e.target.value })} style={{ paddingLeft: '14px' }} />
                 </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div className="bv-search" style={{ width: '200px' }}>
-                        <input placeholder="Tìm kiếm..." value={historySearch} onChange={e => this.setState({ historySearch: e.target.value })} style={{ paddingLeft: '14px' }} />
-                    </div>
-                    <select className="bv-input" style={{ width: '150px' }} value={historySort} onChange={e => this.setState({ historySort: e.target.value })}>
-                        <option value="newest">Mới nhất trước</option>
-                        <option value="oldest">Cũ nhất trước</option>
-                    </select>
-                </div>
+                <select className="bv-input" style={{ width: '150px' }} value={historySort} onChange={e => this.setState({ historySort: e.target.value })}>
+                  <option value="newest">Mới nhất trước</option>
+                  <option value="oldest">Cũ nhất trước</option>
+                </select>
+              </div>
             </div>
-            
+
             <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px', paddingRight: '8px' }}>
-                {historyLogs.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>Chưa có hoạt động nào</div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {historyLogs.map((log, i) => (
-                            <div key={i} style={{ display: 'flex', gap: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                    {log.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: '14px', color: '#1e293b', fontWeight: 600 }}>{log.name} <span style={{ color: '#64748b', fontWeight: 'normal' }}>({log.email})</span></div>
-                                    <div style={{ fontSize: '13px', color: '#337ab7', marginTop: '2px' }}>Đã ghi danh ứng cử viên</div>
-                                </div>
-                                <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#94a3b8' }}>
-                                    {log.dateStr}
-                                </div>
-                            </div>
-                        ))}
+              {historyLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
+                  {voteHistory.length === 0 ? 'Chưa có ai bỏ phiếu' : 'Không tìm thấy kết quả'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {historyLogs.map((log, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '16px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ecfdf5', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '16px' }}>
+                        {(log.voter_name || log.voter_email || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          title={log.voter_email}
+                          style={{ fontSize: '14px', color: '#1e293b', fontWeight: 600, cursor: 'default', display: 'inline-block' }}
+                        >
+                          {log.voter_name || log.voter_email}
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#10B981', marginTop: '2px' }}>
+                          Đã bỏ phiếu cho <strong>{log.candidate_name || 'Ứng viên'}</strong>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{log.dateStr}</div>
                     </div>
-                )}
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

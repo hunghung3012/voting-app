@@ -8,7 +8,6 @@ import '../static/styles.css';
 export default (props) => {
   const address = Cookies.get('address');
   const email = Cookies.get('company_email') || Cookies.get('voter_email') || '';
-  const isVoter = !!Cookies.get('voter_email');
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
   const signOut = () => {
@@ -30,35 +29,33 @@ export default (props) => {
       </Head>
       <ToastContainer />
 
-      {!isVoter && (
-        <nav className="bv-sidebar">
-          <div className="bv-sidebar-logo">Block<span>Votes</span></div>
-          <div className="bv-sidebar-nav">
-            <Link route={`/election/${address}/company_dashboard`}>
-              <a className={`bv-sidebar-item ${isActive('company_dashboard') ? 'active' : ''}`}>
-                Bảng Điều Khiển
-              </a>
-            </Link>
-            <Link route={`/election/${address}/candidate_list`}>
-              <a className={`bv-sidebar-item ${isActive('candidate_list') ? 'active' : ''}`}>
-                Ứng Cử Viên
-              </a>
-            </Link>
-            <Link route={`/election/${address}/voting_list`}>
-              <a className={`bv-sidebar-item ${isActive('voting_list') ? 'active' : ''}`}>
-                Cử Tri
-              </a>
-            </Link>
-          </div>
-          <div className="bv-sidebar-footer">
-            <a className="bv-sidebar-item" onClick={signOut} style={{ cursor: 'pointer' }}>
-              Đăng Xuất
+      <nav className="bv-sidebar">
+        <div className="bv-sidebar-logo">Block<span>Votes</span></div>
+        <div className="bv-sidebar-nav">
+          <Link route={`/election/${address}/company_dashboard`}>
+            <a className={`bv-sidebar-item ${isActive('company_dashboard') ? 'active' : ''}`}>
+              Bảng Điều Khiển
             </a>
-          </div>
-        </nav>
-      )}
+          </Link>
+          <Link route={`/election/${address}/candidate_list`}>
+            <a className={`bv-sidebar-item ${isActive('candidate_list') ? 'active' : ''}`}>
+              Ứng Cử Viên
+            </a>
+          </Link>
+          <Link route={`/election/${address}/voting_list`}>
+            <a className={`bv-sidebar-item ${isActive('voting_list') ? 'active' : ''}`}>
+              Cử Tri
+            </a>
+          </Link>
+        </div>
+        <div className="bv-sidebar-footer">
+          <a className="bv-sidebar-item" onClick={signOut} style={{ cursor: 'pointer' }}>
+            Đăng Xuất
+          </a>
+        </div>
+      </nav>
 
-      <main className={isVoter ? '' : 'bv-main'}>
+      <main className="bv-main">
         <div className="bv-topbar">
           <div></div>
           <div className="bv-topbar-user">
